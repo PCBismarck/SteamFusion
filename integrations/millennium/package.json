@@ -1,0 +1,16 @@
+{
+  "name": "steamfusion-millennium",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "starlight --release pack",
+    "test": "node --experimental-strip-types --test tests/*.test.ts",
+    "prepare": "starlight lsp"
+  },
+  "devDependencies": {
+    "@steambrew/starlight": "1.1.3",
+    "@types/react": "19.1.1",
+    "@types/react-dom": "19.1.1"
+  }
+}

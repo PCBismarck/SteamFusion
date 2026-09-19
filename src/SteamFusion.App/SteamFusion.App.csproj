@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework><UseWPF>true</UseWPF><UseWindowsForms>true</UseWindowsForms><OutputType>WinExe</OutputType>
+    <AssemblyName>SteamFusion</AssemblyName><StartupObject>SteamFusion.App.Program</StartupObject>
+    <ApplicationIcon>Assets/SteamFusion.ico</ApplicationIcon>
+  </PropertyGroup>
+  <ItemGroup><ProjectReference Include="../SteamFusion.Windows/SteamFusion.Windows.csproj" /></ItemGroup>
+  <ItemGroup>
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="Assets/SteamFusion.ico" />
+    <Resource Include="Assets/SteamFusion.png" />
+    <Content Include="Assets/SteamFusion.ico" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="Assets/SteamFusion.png" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="Assets/ICON-DESIGN.md" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

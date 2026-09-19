@@ -1,0 +1,108 @@
+# SteamFusion
+
+Windows 上的双账号 Steam 游戏路由工具。通过普通 Steam 与 Sandboxie 固定沙盒保持两个账号在线，按游戏规则选择对应账号启动；不适合沙盒的游戏可通过 Watt Toolkit 切换到普通客户端。
+
+当前为实验性原型，最多配置两个账号。它不会增加游戏许可，也不需要把两个账号加入同一个 Steam 家庭。
+
+## 功能
+
+- **游戏路由**：按名称或 AppID 搜索，设置游玩账号、普通/自动运行模式和存档策略。
+- **Steam 库集成**：Millennium 插件在需要路由的原生详情页添加启动按钮，并尝试接管原生启动调用；可选非 Steam 备用快捷方式。
+- **账号与环境**：固定账号沙盒、手动切号、Watt Toolkit 普通版和 Microsoft Store 版支持。
+- **共享安装目录**：可让沙盒 Steam 直接下载、更新到指定公共游戏库。
+- **数据导出**：从本机缓存导出分账号游戏时长、成就汇总和逐条明细，格式为 CSV 和 JSON。
+- **托盘**：点击 × 关闭设置窗口并保留后台，双击蓝色 S 图标恢复，右键可退出。
+
+## 构建
+
+需要 .NET 10 SDK、Node.js 22.18+ 和 npm。运行程序的目标平台为 Windows x64；自包含发布包无需用户安装 .NET。
+
+Windows PowerShell：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\publish-win.ps1
+```
+
+Linux / WSL 交叉发布：
+
+```bash
+bash scripts/publish-wsl.sh
+# 自定义 SDK 路径：STEAMFUSION_DOTNET=/path/to/dotnet
+# 若宿主缺少 ICU，可设置 DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1。
+```
+
+脚本运行核心和插件测试，并生成 `artifacts/win-x64`。请保留整个发布目录，包括运行时 DLL、Assets、Scripts 和 Millennium 子目录；不要只复制 EXE。
+
+## 首次配置
+
+1. 安装 Steam、Sandboxie-Plus，以及需要自动切号时使用的 Watt Toolkit。若需要原生库按钮集成，还需安装支持 Starlight 插件的 Millennium。发布包中的 `Scripts/Dependencies.cmd` 提供安装页面入口。
+2. 在普通 Steam 中分别登录并记住两个账号，然后正常退出 Steam。运行 `Scripts/Install.cmd`，初始化本机配置、注册控制器路径、生成快捷方式，并在检测到 Millennium 时安装插件。
+3. 打开 `SteamFusion.exe`，核对检测到的两个账号、默认普通账号和工具路径。Watt 商店版使用 `store:WattToolkit`，不要填写 WindowsApps 中的程序路径。当前账号初始化取 Steam 记住的前两个账号，务必核对；需要调整账号列表时先退出后台，再编辑 `%LOCALAPPDATA%\SteamFusion\config.json`。
+4. 运行 `Scripts/Create-Sandboxes.cmd` 创建持久沙盒。它会备份 Sandboxie 配置，并为新沙盒设置发布目录下的 `Sandboxes` 数据位置；已有沙盒的数据不会自动迁移。
+5. 分别打开沙盒 Steam，核对并登录相应账号，完成 Steam Guard。沙盒名称不能证明实际登录身份；SteamFusion 不处理账号密码。
+6. 在普通 Steam 的 Millennium 设置中启用 SteamFusion。让每个账号分别在普通客户端完成库加载，再通过“导入游戏库”导入可访问游戏，或手动添加 AppID。导入保留已有规则；家庭共享访问不视为直接购买。
+7. 核对游戏账号与存档策略后启用规则。初始化附带的 CrossCode 条目默认禁用，仅作候选示例，不代表账号拥有该游戏。
+
+`Launchers/SteamFusion.lnk` 打开设置；`Small Steam.lnk` 与 `Main Steam.lnk` 均为沙盒 Steam 入口。普通客户端使用原有 Steam 快捷方式。快捷方式只选择环境，不保证 Steam 自动登录的账号。
+
+可运行 `Scripts/Install.ps1 -Startup` 注册 Windows 登录时启动后台。`SteamFusion.exe --agent` 仅启动后台和托盘。图标可能被 Windows 放在任务栏的隐藏图标区域；双击打开设置，右键退出。普通最小化按钮仍缩到任务栏。退出控制器不会关闭已运行的 Steam 或游戏。
+
+## 日常使用
+
+在 Steam 库中点击路由按钮，控制器选择普通或沙盒 Steam，并在必要时提示核对登录身份、云同步与存档。环境和账号已经符合规则时使用原生启动流程。
+
+对于不能在沙盒运行的游戏，选择“必须使用普通客户端”，允许自动切号，或在“账号与环境”页面手动交换普通账号。交换不会迁移正在运行的进程，也不会在游戏结束后自动换回。
+
+新游戏可在设置里选择“到所属账号下载”。它只打开目标客户端的游戏页面，安装目录和开始下载仍在 Steam 中操作。无需为未安装游戏创建非 Steam 入口；“自动添加非 Steam 备用入口”是独立的可选功能。
+
+## 共享下载与更新
+
+正常退出沙盒 Steam 后，对已有公共库运行下列命令，再重新启动沙盒 Steam。这里的路径只是示例，按实际位置修改：
+
+```powershell
+.\Scripts\Shared-Library.cmd -LibraryRoot 'E:\SteamLibrary'
+```
+
+只为 `steam.exe` 放行该库 `steamapps` 的写入。下载、更新和卸载会直接影响公共副本；账号资料及其他目录仍按沙盒规则隔离。按进程名匹配不是对同名程序的安全边界。
+
+安装时选择已放行的库。同一游戏只在一个客户端安装、更新或卸载，且不要在另一客户端运行该游戏时更新；当前没有跨客户端下载互斥。未放行的库仍产生沙盒副本，清空沙盒会丢失其中的数据。启用共享库不会自动处理历史副本。
+
+撤销放行使用同一命令追加 `-Disable`，然后重启沙盒 Steam；不会删除已下载的公共文件。
+
+## 时长和成就导出
+
+“数据导出”页面可选择全部或单个账号，读取本机数据并生成 `games.csv`、`achievements.csv`、`data.json` 和说明文件。CLI 也支持：
+
+```powershell
+.\SteamFusion.Cli.exe export-data 'E:\MySteamExports'
+.\SteamFusion.Cli.exe export-data 'E:\MySteamExports' account1
+```
+
+数据来自普通及已配置沙盒的 Steam 本地缓存。同一账号的多份时长按缓存快照选择，不累加；缺失值保持未知。成就保留汇总和可读取的明细，标记完整性。缓存可能陈旧或不完整，当前没有联网补齐功能，文件修改时间也不是服务器同步时间。
+
+CSV 使用 UTF-8 BOM，处理公式注入和长 SteamID 的 Excel 精度问题；JSON 保留类型。导出含账号身份与游玩记录，应作为个人数据保存，勿提交到公开仓库。
+
+## 兼容性与限制
+
+- Steam / Millennium 更新可能改变非公开界面和接口；原生详情页适配和启动包装为实验功能，未验证所有右键、双击和大屏入口。
+- 测试环境中 Millennium 3.4.1 在 Sandboxie 内触发异常退出。创建沙盒脚本检测到 Steam 本地加载器时，会只在相关沙盒中阻止其 `wsock32.dll`，避免加载 Millennium。普通 Steam 插件保留；沙盒内不能依赖插件身份信号或原生按钮接管，控制器使用人工确认。
+- 游戏兼容性需逐个确认。启动请求被接受不代表游戏进程已经就绪；游戏许可、更新、Steam Guard 和云冲突由 Steam 处理。
+- 尚未实现自动存档迁移。无云存档游戏应固定运行环境；跨环境前自行核对存档。
+- 运行中游戏阻止已知的账号交换；下载与云同步状态缺少可靠接口，需要用户确认。程序不强制结束 Steam 来完成切号。
+- 配置、状态、信号和库快照保存在 `%LOCALAPPDATA%\SteamFusion`。发布目录中的沙盒和备份也可能包含个人数据；卸载程序文件前保留所需存档。
+
+## 开发与验证
+
+```bash
+dotnet run --project tests/SteamFusion.Tests -c Release
+cd integrations/millennium
+npm ci --ignore-scripts
+npm test
+npm run build
+```
+
+Windows 文件集成测试：正常退出 Steam 后运行 `dotnet run --project tests/SteamFusion.Windows.Tests -c Release`。这些测试在临时目录验证快捷方式读写、幂等性、备份、损坏保护和中文路径。
+
+结构：`src/SteamFusion.Core` 为路由与数据处理，`src/SteamFusion.Windows` 为 Windows 集成，`src/SteamFusion.App` 为 WPF UI 和托盘，`src/SteamFusion.Cli` 为命令行入口，`integrations/millennium` 为插件，`packaging` 为安装维护脚本。
+
+验证范围见 [VERIFICATION.md](VERIFICATION.md)，本地数据与提交注意事项见 [docs/PRIVACY.md](docs/PRIVACY.md)。图标生成说明保留在 `src/SteamFusion.App/Assets/ICON-DESIGN.md`。
