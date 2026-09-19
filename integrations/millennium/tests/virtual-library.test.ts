@@ -122,3 +122,45 @@ test('invalid saved sort and unavailable storage fall back without breaking the 
         assert.equal(select.value,'appid-desc');assert.equal(doc.querySelectorAll('.sfvl-card').length,1);
     } finally {view.dispose();dom.window.close();}
 });
+
+test('collapsible sidebar browses the full library and shares search, sorting and safe detail navigation', () => {
+    const dom = new JSDOM('<body><aside id="sidebar"><div class="native-nav"></div><button id="native-game">Native game</button></aside></body>', {url:'https://steamloopback.host'});
+    const doc = dom.window.document;
+    globalThis.ResizeObserver = class {observe(){} disconnect(){}};
+    doc.querySelector('#sidebar').getBoundingClientRect = () => ({left:0,right:250,top:80,bottom:780,width:250,height:700});
+    const native = doc.querySelector('#native-game'); let nativeClicks = 0; native.addEventListener('click',()=>nativeClicks++);
+    let model = {enabled:true,user:'76561198000000001',loading:false,games:Array.from({length:135},(_,i)=>({appId:i+1,steamId:'76561198000000002',enabled:true,mode:'auto',gameName:`Game ${i+1}`}))};
+    let downloads=0;
+    const options={document:()=>doc,navigationClass:()=> 'native-nav',model:()=>model,refreshData:()=>{},download:async()=>{downloads++;}};
+    let view=installVirtualLibrary(options);
+    try {
+        view.refresh();assert.equal(doc.querySelector('.sfvl-side-body').hidden,true);
+        doc.querySelector('.sfvl-side-toggle').click();assert.equal(doc.querySelector('.sfvl-side-body').hidden,false);
+        assert.equal(doc.querySelectorAll('.sfvl-side-game').length,135);
+        const last=doc.querySelector('.sfvl-side-game[data-appid="135"]');last.focus();last.click();
+        assert.equal(doc.querySelector('.sfvl-detail h2').textContent,'Game 135');assert.equal(doc.activeElement,last);
+        assert.equal(last.getAttribute('aria-current'),'page');assert.equal(downloads,0);
+        last.dispatchEvent(new dom.window.Event('pointerdown',{bubbles:true}));assert.equal(doc.querySelector('.sfvl-page').hidden,false);
+        doc.querySelector('.sfvl-side-list').scrollTop=200;
+        const input=doc.querySelector('.sfvl-side-search');input.value='135';input.dispatchEvent(new dom.window.Event('input'));
+        assert.equal(doc.querySelector('.sfvl-controls input').value,'135');
+        assert.equal(doc.querySelector('.sfvl-side-list').scrollTop,0);
+        assert.equal(doc.querySelectorAll('.sfvl-side-game').length,1);assert.equal(doc.querySelectorAll('.sfvl-card').length,1);
+        const gridSearch=doc.querySelector('.sfvl-controls input');gridSearch.value='';gridSearch.dispatchEvent(new dom.window.Event('input'));
+        assert.equal(input.value,'');assert.equal(doc.querySelectorAll('.sfvl-side-game').length,135);
+        const sort=doc.querySelector('select');sort.value='appid-desc';sort.dispatchEvent(new dom.window.Event('change'));
+        assert.equal(doc.querySelector('.sfvl-side-game').dataset.appid,'135');
+        const first=doc.querySelector('.sfvl-side-game');first.focus();first.dispatchEvent(new dom.window.KeyboardEvent('keydown',{key:'ArrowDown',bubbles:true}));
+        assert.equal(doc.activeElement.dataset.appid,'134');assert.equal(doc.querySelector('.sfvl-detail h2').textContent,'Game 134');
+        const stale=doc.activeElement;model={...model,games:model.games.filter(g=>g.appId!==134)};view.refresh();
+        assert.equal(doc.querySelector('.sfvl-side-game[data-appid="134"]'),null);assert.equal(doc.querySelector('.sfvl-detail'),null);
+        stale.click();assert.equal(doc.querySelector('.sfvl-detail'),null);
+        native.dispatchEvent(new dom.window.Event('pointerdown',{bubbles:true}));native.click();
+        assert.equal(doc.querySelector('.sfvl-page').hidden,true);assert.equal(nativeClicks,1);
+        view.dispose();view=installVirtualLibrary(options);view.refresh();assert.equal(doc.querySelector('.sfvl-side-body').hidden,false);
+        const old=doc.querySelector('.sfvl-side-game');model={...model,user:'76561198000000003'};old.click();assert.equal(doc.querySelector('.sfvl-page').hidden,true);
+        view.refresh();assert.equal(doc.querySelector('.sfvl-side-body').hidden,true);
+        model={...model,enabled:false};view.refresh();assert.equal(doc.querySelector('.sfvl-side-group'),null);
+        assert.equal(doc.querySelector('#native-game'),native);assert.equal(downloads,0);
+    } finally {view.dispose();dom.window.close();}
+});

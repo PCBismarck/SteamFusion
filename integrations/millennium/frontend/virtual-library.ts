@@ -1,6 +1,7 @@
 import type { Mapping } from './routing';
 import { artworkUrl, filterGames, librarySort, librarySorts, sortGames } from './uninstalled.ts';
 import type { LibrarySort } from './uninstalled.ts';
+import { createSidebarLibrary, sidebarStyles } from './sidebar-library.ts';
 
 export type VirtualLibraryModel = { enabled: boolean; user: string | null; games: Mapping[]; loading: boolean; error?: string };
 /** Mount only our own DOM; no shortcuts, collection records or Steam ownership data are written. */
@@ -12,6 +13,7 @@ export function installVirtualLibrary(options: {
     let style: HTMLStyleElement | undefined, grid: HTMLElement | undefined, summary: HTMLElement | undefined;
     let status: HTMLElement | undefined, search: HTMLInputElement | undefined, more: HTMLElement | undefined;
     let drawer: HTMLElement | undefined, sidebar: HTMLElement | undefined;
+    let quick: ReturnType<typeof createSidebarLibrary> | undefined;
     let sort: HTMLSelectElement | undefined, order: LibrarySort = 'name-asc';
     const sortKey = () => `steamfusion.uninstalled.sort.v1:${previousUser ?? 'anonymous'}`;
     function loadSort() {
@@ -41,7 +43,11 @@ export function installVirtualLibrary(options: {
         const node = doc!.createElement(tag); node.className = cls; if (text != null) node.textContent = text; return node;
     };
     const action = (text: string, fn: () => void, cls = '') => { const b = el('button', cls, text); b.type = 'button'; b.addEventListener('click', fn); return b; };
-    function close() { cancelLoad(); shown = false; if (panel) panel.hidden = true; button?.setAttribute('aria-expanded', 'false'); drawer?.remove(); drawer = undefined; }
+    function close() { cancelLoad(); shown = false; if (panel) panel.hidden = true; button?.setAttribute('aria-expanded', 'false'); drawer?.remove(); drawer = undefined; quick?.select(null); }
+    function setQuery(value: string) {
+        cancelLoad(); query = value; if (search) search.value = query; limit = 60;
+        if (scroll) scroll.scrollTop = 0; render();
+    }
     function position() {
         if (!panel || !sidebar) return;
         const rect = sidebar.getBoundingClientRect();
@@ -53,7 +59,7 @@ export function installVirtualLibrary(options: {
     }
     function outside(event: Event) {
         const path = event.composedPath();
-        if (shown && !path.includes(panel!) && !path.includes(button!)) close();
+        if (shown && !path.includes(panel!) && !path.includes(quick?.root ?? button!)) close();
     }
     function keyboard(event: KeyboardEvent) { if (event.key === 'Escape' && shown) { close(); button?.focus(); } }
     function picture(game: Mapping, kind: 'cover' | 'hero') {
@@ -75,23 +81,25 @@ export function installVirtualLibrary(options: {
         } catch (error) { if (options.model().user === user) status!.textContent = `打开失败：${String(error)}`; }
         finally { pending = false; target.disabled = false; target.textContent = label; }
     }
-    function showDetails(game: Mapping) {
+    function showDetails(game: Mapping, focus = true) {
+        quick?.select(game.appId);
         drawer?.remove(); drawer = el('aside', 'sfvl-detail'); drawer.setAttribute('aria-label', game.gameName!);
-        const top = el('div', 'sfvl-hero'); top.append(picture(game, 'hero'), action('×', () => { drawer?.remove(); drawer = undefined; }, 'sfvl-dismiss'));
+        const top = el('div', 'sfvl-hero'); top.append(picture(game, 'hero'), action('×', () => { drawer?.remove(); drawer = undefined; quick?.select(null); }, 'sfvl-dismiss'));
         const body = el('div', 'sfvl-detail-body');
         body.append(el('span', 'sfvl-eyebrow', '来自另一账号'), el('h2', '', game.gameName), el('p', 'sfvl-muted', game.accountName || '所属账号'));
         const go = action('到所属账号下载', () => void download(game, go), 'sfvl-primary');
         body.append(go, el('p', 'sfvl-note', '打开对应 Steam 的游戏页面，选择安装目录后下载。'),
             el('p', 'sfvl-note', '安装完成后，此游戏会自动从本页移出。'), el('span', 'sfvl-appid', `APP ${game.appId}`));
-        drawer.append(top, body); panel!.append(drawer); go.focus();
+        drawer.append(top, body); panel!.append(drawer); if (focus) go.focus();
     }
     function render(append = false) {
-        if (!grid || !shown) return;
         const model = options.model(); const matches = sortGames(filterGames(model.games, query), order);
+        quick?.update({ ...model, games: matches, query, order, total: model.games.length });
+        if (!grid || !shown) return;
         const key = JSON.stringify(matches.map(g => [g.appId, g.gameName, g.accountName]));
         if (key !== renderedKey || model.loading || model.error) append = false;
         const start = append ? grid.children.length : 0;
-        if (!append) { grid.replaceChildren(); drawer?.remove(); drawer = undefined; }
+        if (!append) { grid.replaceChildren(); drawer?.remove(); drawer = undefined; quick?.select(null); }
         renderedKey = key;
         summary!.textContent = model.loading ? '正在读取安装状态…' : `${model.games.length} 款未安装游戏${query ? ` · 找到 ${matches.length} 款` : ''}`;
         if (model.error) { grid.append(el('p', 'sfvl-empty', model.error)); more!.hidden = true; return; }
@@ -106,27 +114,34 @@ export function installVirtualLibrary(options: {
         more!.textContent = matches.length <= limit ? `已显示全部 ${matches.length} 款游戏` : `已显示 ${limit} / ${matches.length} 款 · 向下滚动继续加载`;
         scheduleLoad();
     }
-    function open() {
-        shown = true; panel!.hidden = false; button!.setAttribute('aria-expanded', 'true'); position(); render(); search?.focus();
+    function open(focus = true) {
+        shown = true; panel!.hidden = false; button!.setAttribute('aria-expanded', 'true'); position(); render(); if (focus) search?.focus();
         options.refreshData();
     }
     function unmount() {
         cancelLoad(); scroll?.removeEventListener('scroll', scheduleLoad); scroll = undefined; renderedKey = '';
         observer?.disconnect(); observer = undefined; doc?.removeEventListener('pointerdown', outside, true); doc?.removeEventListener('keydown', keyboard);
         doc?.defaultView?.removeEventListener('resize', position); button?.remove(); panel?.remove(); style?.remove();
+        quick?.dispose(); quick = undefined;
         button = undefined; panel = undefined; sidebar = undefined; sort = undefined; shown = false; lastKey = '';
     }
     function mount(navigation: HTMLElement) {
         sidebar = navigation.parentElement ?? undefined; if (!sidebar) return;
-        style = el('style'); style.textContent = styles; doc!.head.append(style);
+        style = el('style'); style.textContent = styles + sidebarStyles; doc!.head.append(style);
         button = action('▦  另一账号 · 未安装', () => shown ? close() : open(), 'sfvl-nav'); button.setAttribute('aria-expanded', 'false');
-        navigation.after(button);
+        quick = createSidebarLibrary(doc!, button, { search: setQuery, select: id => {
+            const model = options.model();
+            if (!model.enabled || model.loading || model.error || model.user !== previousUser) return;
+            const game = model.games.find(g => g.appId === id); if (!game) return;
+            open(false); showDetails(game, false);
+        } });
+        navigation.after(quick.root);
         panel = el('section', 'sfvl-page'); panel.hidden = true; panel.setAttribute('aria-label', 'SteamFusion 未安装游戏');
         const head = el('header', 'sfvl-header'); const title = el('div');
         title.append(el('span', 'sfvl-eyebrow', 'STEAMFUSION LIBRARY'), el('h1', '', '留给下一次冒险'), summary = el('p', 'sfvl-muted'));
         head.append(title, action('返回游戏库', () => close(), 'sfvl-secondary'));
         const controls = el('div', 'sfvl-controls'); search = el('input'); search.type = 'search'; search.placeholder = '搜索游戏名称或 AppID'; search.setAttribute('aria-label', '搜索另一账号未安装游戏');
-        search.value = query; search.addEventListener('input', () => { cancelLoad(); query = search!.value; limit = 60; if (scroll) scroll.scrollTop = 0; render(); });
+        search.value = query; search.addEventListener('input', () => setQuery(search!.value));
         const sortLabel = el('label', 'sfvl-sort', '排序'); sort = el('select'); sort.setAttribute('aria-label', '未安装游戏排序');
         for (const item of librarySorts) { const option = el('option', '', item.label); option.value = item.value; sort.append(option); }
         sort.value = order;
@@ -155,7 +170,7 @@ export function installVirtualLibrary(options: {
         if (!doc?.body || !model.enabled) { unmount(); return; }
         const cls = options.navigationClass(); const navigation = cls ? doc.getElementsByClassName(cls)[0] as HTMLElement | undefined : undefined;
         if (!navigation) { unmount(); return; }
-        if (!button?.isConnected || button.previousElementSibling !== navigation) { unmount(); mount(navigation); }
+        if (!button?.isConnected || quick?.root.previousElementSibling !== navigation) { unmount(); mount(navigation); }
         if (!button || !panel) return;
         const label = model.games[0]?.accountName?.split(' · ')[0]?.trim() || '另一账号';
         const navText = `▦  ${label} · 未安装`;
