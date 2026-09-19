@@ -21,6 +21,7 @@ public sealed class SettingsWindow : Window
     private readonly CheckBox automatic = new() { Content = "必须在普通客户端运行时，允许自动切号" };
     private readonly CheckBox dual = new() { Content = "切号后，让另一个账号继续在沙盒中登录" };
     private readonly CheckBox integrate = new() { Content = "自动添加非 Steam 备用入口" };
+    private readonly CheckBox uninstalled = new() { Content = "在 Steam 插件中显示另一账号的未安装游戏页" };
     private readonly TextBlock status = Ui.Text("", 12, true), counts = Ui.Text("", 12, true), listCount = Ui.Text("", 12, true);
     private readonly TextBlock gameTitle = Ui.Heading("选择一个游戏"), gameMeta = Ui.Text("", 12, true);
     private readonly StackPanel editor = new();
@@ -41,7 +42,7 @@ public sealed class SettingsWindow : Window
         foreach (var choice in new[] { native, account })
         { choice.ItemsSource = config.Accounts; choice.DisplayMemberPath = "Name"; choice.SelectedValuePath = "Id"; }
         native.SelectedValue = config.DefaultNativeAccountId;
-        dual.IsChecked = config.KeepBothOnline; integrate.IsChecked = config.IntegrateLibrary;
+        dual.IsChecked = config.KeepBothOnline; integrate.IsChecked = config.IntegrateLibrary; uninstalled.IsChecked = config.UninstalledLibrary;
         mode.ItemsSource = new[] { new Item("按账号位置自动路由", "auto"), new Item("必须使用普通客户端", "native") };
         saves.ItemsSource = new[] { new Item("尚未确认 · 跨环境时提醒", "unknown"), new Item("使用 Steam 云存档", "cloud"), new Item("固定在普通环境", "native"), new Item("固定在该账号沙盒", "sandbox") };
         foreach (var choice in new[] { mode, saves }) { choice.DisplayMemberPath = "Label"; choice.SelectedValuePath = "Value"; }
@@ -124,7 +125,7 @@ public sealed class SettingsWindow : Window
         var panel = new StackPanel(); var paths = new StackPanel(); paths.Children.Add(Ui.Heading("本机工具"));
         AddPath(paths, "Steam 客户端", steam); AddPath(paths, "Watt Toolkit", watt, "Microsoft Store 版使用 store:WattToolkit，无需选择安装目录。"); AddPath(paths, "Sandboxie · Start.exe", sandbox);
         var save = Ui.Button("保存设置", Save, true); save.HorizontalAlignment = HorizontalAlignment.Left; paths.Children.Add(save); panel.Children.Add(Ui.Card(paths));
-        var advanced = new StackPanel(); advanced.Children.Add(Ui.Heading("游戏库与下载")); advanced.Children.Add(integrate);
+        var advanced = new StackPanel(); advanced.Children.Add(Ui.Heading("游戏库与下载")); advanced.Children.Add(integrate); advanced.Children.Add(uninstalled);
         advanced.Children.Add(Ui.Text("已安装游戏保留 Steam 原生详情页。取消备用入口选项后，会移除自动生成的非 Steam 入口。", 12, true));
         var shared = Ui.Text(config.SharedLibraryDownloads ? "共享库下载已启用。同一游戏请只在一个客户端中更新或卸载。" : "共享库下载未启用，沙盒下载的文件可能保留在沙盒内。", 12, true); shared.Margin = new(0, 12, 0, 14); advanced.Children.Add(shared);
         var install = Ui.Button("添加到 Steam 游戏库", InstallShortcuts); install.HorizontalAlignment = HorizontalAlignment.Left; advanced.Children.Add(install);
@@ -193,7 +194,7 @@ public sealed class SettingsWindow : Window
         if (controller.Busy) throw new InvalidOperationException("请等待当前操作结束再修改配置。");
         var updated = config with { SteamExe = steam.Text.Trim(), WattExe = watt.Text.Trim(), SandboxieStartExe = sandbox.Text.Trim(),
             DefaultNativeAccountId = native.SelectedValue as string ?? "", KeepBothOnline = dual.IsChecked == true,
-            IntegrateLibrary = integrate.IsChecked == true,
+            IntegrateLibrary = integrate.IsChecked == true, UninstalledLibrary = uninstalled.IsChecked == true,
             SharedLibraryDownloads = File.Exists(Discovery.Store.ConfigPath) ? Discovery.Store.Load().SharedLibraryDownloads : config.SharedLibraryDownloads,
             Games = [.. (File.Exists(Discovery.Store.ConfigPath) ? Discovery.Store.Load().Games : config.Games)] };
         if (uint.TryParse(selectedGame.SelectedValue as string, out var id) && account.SelectedValue is string accountId)

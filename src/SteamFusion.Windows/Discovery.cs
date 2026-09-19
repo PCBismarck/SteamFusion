@@ -20,7 +20,8 @@ public static class Discovery
         ConfigurationStore.AtomicWrite(Path.Combine(DataDirectory, "plugin-routes.json"), Json.Encode(new
         {
             environment = "__ENVIRONMENT__",
-            library = new { enabled = config.IntegrateLibrary, cliExe = Path.Combine(AppContext.BaseDirectory, "SteamFusion.Cli.exe") },
+            library = new { enabled = config.IntegrateLibrary, cliExe = Path.Combine(AppContext.BaseDirectory, "SteamFusion.Cli.exe"),
+                uninstalled = config.UninstalledLibrary, hostSteamId = config.Accounts.FirstOrDefault(a => a.Id == config.DefaultNativeAccountId)?.SteamId },
             games = config.Games.Select(g => new { g.AppId, steamId = config.Accounts.Single(a => a.Id == g.AccountId).SteamId,
                 gameName = g.Name,
                 accountName = config.Accounts.Single(a => a.Id == g.AccountId).Name,

@@ -76,6 +76,26 @@ function fusion_launch(appId)
 end
 
 ---@ffi
+---@param appId number
+---@return boolean
+function fusion_download(appId)
+    if appId < 1 or appId > 4294967295 or appId ~= math.floor(appId) then error("AppID 无效") end
+    return spawn("download " .. string.format("%.0f", appId))
+end
+
+local installation_refresh = 0
+---@ffi
+---@return string
+function fusion_installations()
+    if environment ~= "native" then return "null" end
+    if os.time() - installation_refresh >= 20 then
+        installation_refresh = os.time()
+        spawn("refresh-installations")
+    end
+    return read(state .. "\\installation-index.json") or "null"
+end
+
+---@ffi
 ---@return boolean
 function fusion_settings() return spawn("settings") end
 

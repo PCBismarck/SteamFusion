@@ -37,6 +37,7 @@ public sealed record Configuration
     public string DefaultNativeAccountId { get; init; } = "";
     public bool KeepBothOnline { get; init; } = true;
     public bool IntegrateLibrary { get; init; }
+    public bool UninstalledLibrary { get; init; }
     public bool SharedLibraryDownloads { get; init; }
     public List<Account> Accounts { get; init; } = [];
     public List<Game> Games { get; init; } = [];

@@ -11,6 +11,7 @@
   "devDependencies": {
     "@steambrew/starlight": "1.1.3",
     "@types/react": "19.1.1",
-    "@types/react-dom": "19.1.1"
+    "@types/react-dom": "19.1.1",
+    "jsdom": "26.1.0"
   }
 }

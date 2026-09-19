@@ -1,14 +1,18 @@
-import { definePlugin, Field, appActionButtonClasses } from 'millennium';
+import { definePlugin, Field, appActionButtonClasses, findModule } from 'millennium';
 import { useState, useEffect } from 'react';
 import { hookRunGame, Mapping } from './routing';
 import { decodeConfiguration } from './configuration';
 import { installDetailsButtons } from './details';
 import { captureLibrary } from './catalog';
+import { installVirtualLibrary, VirtualLibraryModel } from './virtual-library';
+import { installationIds, uninstalledGames } from './uninstalled';
 import { addMissingShortcuts, removeGeneratedShortcuts } from './shortcuts';
 
 declare const backend: {
     fusion_config(): Promise<unknown>;
     fusion_launch(appId: number): Promise<boolean>;
+    fusion_download(appId: number): Promise<boolean>;
+    fusion_installations(): Promise<unknown>;
     fusion_signal(steamId: string, loggedOn: boolean): Promise<boolean>;
     fusion_settings(): Promise<boolean>;
     fusion_catalog(steamId: string, payload: string): Promise<boolean>;
@@ -46,6 +50,19 @@ export default definePlugin(() => {
     const send = async (id: number) => {
         if (!await backend.fusion_launch(id)) throw new Error('无法提交启动请求，请打开 SteamFusion 设置检查。');
     };
+    let virtualModel: VirtualLibraryModel = { enabled: false, user: null, games: [], loading: true };
+    let navigationClass: string | undefined;
+    const virtual = installVirtualLibrary({
+        document: () => (window as any).g_PopupManager?.GetExistingPopup?.('SP Desktop_uid0')?.m_popup?.window?.document,
+        navigationClass: () => navigationClass ??= findModule((m: any) => m.GameListHomeAndSearch && m.CollectionsButton)?.GameListHomeAndSearch,
+        model: () => ({ ...virtualModel, enabled: virtualModel.enabled && currentUser() === virtualModel.user }),
+        refreshData: () => { void refresh(); },
+        download: async id => {
+            if (!virtualModel.enabled || currentUser() !== virtualModel.user || !virtualModel.games.some(g => g.appId === id))
+                throw new Error('账号或游戏安装状态已变化，请刷新后重试。');
+            if (!await backend.fusion_download(id)) throw new Error('下载页面请求未被接受。');
+        },
+    });
     const details = installDetailsButtons(
         () => (window as any).g_PopupManager?.GetExistingPopup?.('SP Desktop_uid0')?.m_popup?.window?.document,
         id => mappings.get(id), () => ({ steamId: currentUser(), environment }), send, report, () => appActionButtonClasses);
@@ -64,6 +81,21 @@ export default definePlugin(() => {
                 report(`已连接：${mappings.size} 个游戏规则；当前环境 ${environment}。`);
             }
             const user = currentUser();
+            const showVirtual = config.library?.uninstalled === true && user === config.library.hostSteamId && environment === 'native';
+            if (showVirtual) {
+                try {
+                    const raw = await backend.fusion_installations();
+                    if (disposed || currentUser() !== user) return;
+                    const state = typeof raw === 'string' ? JSON.parse(raw) : raw;
+                    const installed = installationIds(state);
+                    if (config.games.some(g => !state.accounts.includes(g.steamId))) throw new Error('账号列表已变化，正在等待安装状态刷新。');
+                    virtualModel = { enabled: true, user, loading: false,
+                        games: uninstalledGames(config.games, user, config.library!.hostSteamId, installed, (window as any).appStore?.allApps ?? []) };
+                } catch (error) {
+                    virtualModel = { enabled: true, user, games: [], loading: true, error: String(error) };
+                }
+            } else virtualModel = { enabled: false, user, games: [], loading: false };
+            virtual.refresh();
             details.refresh();
             await backend.fusion_signal(user ?? "", user !== null);
             libraryKey = JSON.stringify([user, config.library, config.games]);
@@ -111,7 +143,7 @@ export default definePlugin(() => {
     const timer = setInterval(() => void refresh(), 2000);
     void refresh();
     const dispose = () => {
-        disposed = true; clearInterval(timer); unhook?.(); details.dispose();
+        disposed = true; clearInterval(timer); unhook?.(); details.dispose(); virtual.dispose();
         if (window.__steamFusionDispose === dispose) delete window.__steamFusionDispose;
     };
     window.__steamFusionDispose = dispose;

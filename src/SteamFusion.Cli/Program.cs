@@ -54,6 +54,7 @@ try
         case "remove-shortcuts":
             Console.WriteLine(LibraryShortcuts.Remove(Discovery.Store.Load(), Environment.ProcessPath!)); return 0;
         case "pipe-name": Console.WriteLine(Ipc.PipeName); return 0;
+        case "refresh-installations": InstallationIndex.Refresh(Discovery.Store.Load()); return 0;
         case "refresh-plugin": Discovery.WritePluginConfiguration(Discovery.Store.Load()); return 0;
         default:
             Console.WriteLine("SteamFusion.Cli discover | init | probe | plan <AppID> | launch <AppID> | download <AppID> | swap <accountId> | status | settings | cancel | exit | catalog-preview | catalog-import | install-shortcuts | remove-shortcuts | pipe-name | refresh-plugin | export-data <directory> [accountId]"); return command == "help" ? 0 : 2;

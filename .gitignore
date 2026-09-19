@@ -50,3 +50,5 @@ Sandboxie.generated.ini
 *.log
 *.bak
 *.tmp
+installation-index.json
+catalog-import.json

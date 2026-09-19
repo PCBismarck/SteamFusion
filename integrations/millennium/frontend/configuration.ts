@@ -1,6 +1,6 @@
 import type { Mapping } from './routing';
 
-export type PluginConfiguration = { environment: string; games: Mapping[]; library?: { enabled: boolean; cliExe: string } };
+export type PluginConfiguration = { environment: string; games: Mapping[]; library?: { enabled: boolean; cliExe: string; uninstalled?: boolean; hostSteamId?: string | null } };
 
 /** Millennium may decode a Lua JSON string before returning it through FFI. */
 export function decodeConfiguration(value: unknown): PluginConfiguration {
@@ -12,6 +12,8 @@ export function decodeConfiguration(value: unknown): PluginConfiguration {
     const ids = new Set<number>();
     if (config.library != null && (typeof config.library.enabled !== 'boolean' || typeof config.library.cliExe !== 'string' ||
         !/^[A-Za-z]:\\[^"\r\n]+\\SteamFusion\.Cli\.exe$/i.test(config.library.cliExe))) throw new Error('游戏库入口配置无效');
+    if (config.library?.uninstalled != null && typeof config.library.uninstalled !== 'boolean' ||
+        config.library?.hostSteamId != null && !/^765\d{14}$/.test(config.library.hostSteamId)) throw new Error('未安装游戏页配置无效');
     for (const game of config.games) {
         if (!game || !Number.isInteger(game.appId) || game.appId < 1 || game.appId > 0xffffffff ||
             ids.has(game.appId) || typeof game.steamId !== 'string' || !/^765\d{14}$/.test(game.steamId) ||
