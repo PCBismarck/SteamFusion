@@ -1,12 +1,24 @@
 using SteamFusion.Core;
 using SteamFusion.Windows;
 
-if (args.Contains("--watt-help"))
+if (args.Contains("--selection-preflight"))
 {
-    var pid = WattStore.Activate("--help");
-    Console.WriteLine("Store activation accepted, PID=" + pid);
+    var cfg = Discovery.Store.Load();
+    var file = Path.Combine(Path.GetDirectoryName(cfg.SteamExe)!, "config", "loginusers.vdf");
+    var original = File.ReadAllBytes(file);
+    foreach (var account in cfg.Accounts)
+    {
+        var selected = SteamLoginUsers.Select(new System.Text.UTF8Encoding(false, true).GetString(original), account);
+        var users = Vdf.Parse(selected.TrimStart('\uFEFF')).Children["users"];
+        Require(users.Children[account.SteamId].Get("MostRecent") == "1" &&
+            users.Children.Count(u => u.Value.Get("MostRecent") == "1") == 1, "Selection must be unique");
+    }
+    Require(original.SequenceEqual(File.ReadAllBytes(file)), "Preflight must not write Steam state");
+    Console.WriteLine("PASS read-only preflight for " + cfg.Accounts.Count + " configured accounts; no Steam state changed.");
     return 0;
 }
+if (args.Contains("--account-selection")) return AccountSelectionTests.Run();
+
 var root = Path.Combine(Path.GetTempPath(), "SteamFusion test 中文 " + Guid.NewGuid().ToString("N"));
 Directory.CreateDirectory(root);
 try
@@ -34,7 +46,6 @@ try
     Require(NativeMethods.Quote(@"C:\a b\") == "\"C:\\a b\\\\\"", "Trailing slash quoting");
     NativeMethods.RequireOutsideSandbox();
     Console.WriteLine("PASS Windows: shortcut install/remove/backup/idempotence/malformed-file protection; Unicode paths; native context.");
-    Console.WriteLine("Watt Store detected=" + WattStore.Installed());
     return 0;
 }
 finally { Directory.Delete(root, true); }

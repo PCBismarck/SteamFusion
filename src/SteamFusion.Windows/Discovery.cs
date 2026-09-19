@@ -5,7 +5,7 @@ using System.Diagnostics;
 namespace SteamFusion.Windows;
 
 public sealed record InstalledGame(uint AppId, string Name, string Directory, string LastOwner);
-public sealed record DiscoveryReport(string SteamExe, string WattExe, string SandboxieStartExe,
+public sealed record DiscoveryReport(string SteamExe, string SandboxieStartExe,
     string DataDirectory, bool MillenniumInstalled, List<Account> Accounts, List<InstalledGame> Games);
 
 public static class Discovery
@@ -35,7 +35,6 @@ public static class Discovery
         var steamPath = Registry.GetValue(@"HKEY_CURRENT_USER\Software\Valve\Steam", "SteamPath", null) as string;
         var steamExe = Existing(steamPath is null ? "" : Path.Combine(steamPath, "steam.exe"));
         var sandbox = Existing(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Sandboxie-Plus", "Start.exe"));
-        string watt = "";
         foreach (var hive in new[] { Registry.CurrentUser, Registry.LocalMachine })
         foreach (var keyPath in new[] { @"Software\Microsoft\Windows\CurrentVersion\Uninstall", @"Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall" })
         {
@@ -45,17 +44,6 @@ public static class Discovery
             {
                 using var key = root.OpenSubKey(name);
                 var display = key?.GetValue("DisplayName") as string ?? "";
-                if (display.Contains("Watt", StringComparison.OrdinalIgnoreCase) || display.Contains("Steam++"))
-                {
-                    var location = key?.GetValue("InstallLocation") as string ?? "";
-                    watt = Existing(Path.Combine(location, "Steam++.exe"));
-                    if (watt.Length == 0)
-                    {
-                        var icon = (key?.GetValue("DisplayIcon") as string ?? "").Trim('"');
-                        var index = icon.LastIndexOf(",", StringComparison.Ordinal);
-                        watt = Existing(index >= 0 ? icon[..index].Trim('"') : icon);
-                    }
-                }
                 if (display.Contains("Sandboxie", StringComparison.OrdinalIgnoreCase))
                 {
                     var location = key?.GetValue("InstallLocation") as string ?? "";
@@ -64,11 +52,6 @@ public static class Discovery
                 }
             }
         }
-        if (watt.Length == 0)
-            foreach (var process in Process.GetProcessesByName("Steam++"))
-                using (process) { try { watt = Existing(process.MainModule?.FileName ?? ""); } catch { } }
-        if (WattStore.Installed() && (watt.Length == 0 || watt.Contains("WindowsApps", StringComparison.OrdinalIgnoreCase)))
-            watt = WattStore.Setting;
         var accounts = new List<Account>();
         var games = new List<InstalledGame>();
         if (steamExe.Length > 0)
@@ -109,7 +92,7 @@ public static class Discovery
                 }
             }
         }
-        return new(steamExe, watt, sandbox, DataDirectory,
+        return new(steamExe, sandbox, DataDirectory,
             steamExe.Length > 0 && (File.Exists(Path.Combine(Path.GetDirectoryName(steamExe)!, "millennium.dll")) ||
                 Directory.Exists(Path.Combine(Path.GetDirectoryName(steamExe)!, "millennium", "bin"))), accounts, games);
     }
@@ -121,7 +104,7 @@ public static class Discovery
         var candidate = accounts.FirstOrDefault(a => a.SteamId == crosscode?.LastOwner) ?? accounts.FirstOrDefault();
         return new()
         {
-            SteamExe = scan.SteamExe, WattExe = scan.WattExe, SandboxieStartExe = scan.SandboxieStartExe,
+            SteamExe = scan.SteamExe, SandboxieStartExe = scan.SandboxieStartExe,
             Accounts = accounts, DefaultNativeAccountId = accounts.FirstOrDefault()?.Id ?? "",
             Games = candidate is null ? [] : [new(368340, "CrossCode", candidate.Id) { Enabled = false }]
         };

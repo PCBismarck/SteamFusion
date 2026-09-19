@@ -1,6 +1,6 @@
 # SteamFusion
 
-Windows 上的双账号 Steam 游戏路由工具。通过普通 Steam 与 Sandboxie 固定沙盒保持两个账号在线，按游戏规则选择对应账号启动；不适合沙盒的游戏可通过 Watt Toolkit 切换到普通客户端。
+Windows 上的双账号 Steam 游戏路由工具。通过普通 Steam 与 Sandboxie 固定沙盒保持两个账号在线，按游戏规则选择对应账号启动；不适合沙盒的游戏可使用内置切号功能切换到普通客户端。
 
 当前为实验性原型，最多配置两个账号。它不会增加游戏许可，也不需要把两个账号加入同一个 Steam 家庭。
 
@@ -9,7 +9,7 @@ Windows 上的双账号 Steam 游戏路由工具。通过普通 Steam 与 Sandbo
 - **虚拟未安装游戏页**：在默认普通账号 Steam 库的侧栏显示另一账号的未安装游戏，提供封面、搜索和下载入口，不创建收藏夹或非 Steam 快捷方式。
 - **游戏路由**：按名称或 AppID 搜索，设置游玩账号、普通/自动运行模式和存档策略。
 - **Steam 库集成**：Millennium 插件在需要路由的原生详情页添加启动按钮，并尝试接管原生启动调用；可选非 Steam 备用快捷方式。
-- **账号与环境**：固定账号沙盒、手动切号、Watt Toolkit 普通版和 Microsoft Store 版支持。
+- **账号与环境**：固定账号沙盒、内置普通客户端切号，无需 Watt Toolkit。
 - **共享安装目录**：可让沙盒 Steam 直接下载、更新到指定公共游戏库。
 - **数据导出**：从本机缓存导出分账号游戏时长、成就汇总和逐条明细，格式为 CSV 和 JSON。
 - **托盘**：点击 × 关闭设置窗口并保留后台，双击蓝色 S 图标恢复，右键可退出。
@@ -36,9 +36,9 @@ bash scripts/publish-wsl.sh
 
 ## 首次配置
 
-1. 安装 Steam、Sandboxie-Plus，以及需要自动切号时使用的 Watt Toolkit。若需要原生库按钮集成，还需安装支持 Starlight 插件的 Millennium。发布包中的 `Scripts/Dependencies.cmd` 提供安装页面入口。
+1. 安装 Steam 和 Sandboxie-Plus。若需要原生库按钮集成，还需安装支持 Starlight 插件的 Millennium。发布包中的 `Scripts/Dependencies.cmd` 提供安装页面入口。
 2. 在普通 Steam 中分别登录并记住两个账号，然后正常退出 Steam。运行 `Scripts/Install.cmd`，初始化本机配置、注册控制器路径、生成快捷方式，并在检测到 Millennium 时安装插件。
-3. 打开 `SteamFusion.exe`，核对检测到的两个账号、默认普通账号和工具路径。Watt 商店版使用 `store:WattToolkit`，不要填写 WindowsApps 中的程序路径。当前账号初始化取 Steam 记住的前两个账号，务必核对；需要调整账号列表时先退出后台，再编辑 `%LOCALAPPDATA%\SteamFusion\config.json`。
+3. 打开 `SteamFusion.exe`，核对检测到的两个账号、默认普通账号和工具路径。账号切换由 SteamFusion 内置处理，无需填写切号工具路径。当前账号初始化取 Steam 记住的前两个账号，务必核对；需要调整账号列表时先退出后台，再编辑 `%LOCALAPPDATA%\SteamFusion\config.json`。
 4. 运行 `Scripts/Create-Sandboxes.cmd` 创建持久沙盒。它会备份 Sandboxie 配置，并为新沙盒设置发布目录下的 `Sandboxes` 数据位置；已有沙盒的数据不会自动迁移。
 5. 分别打开沙盒 Steam，核对并登录相应账号，完成 Steam Guard。沙盒名称不能证明实际登录身份；SteamFusion 不处理账号密码。
 6. 在普通 Steam 的 Millennium 设置中启用 SteamFusion。让每个账号分别在普通客户端完成库加载，再通过“导入游戏库”导入可访问游戏，或手动添加 AppID。导入保留已有规则；家庭共享访问不视为直接购买。
@@ -121,3 +121,11 @@ Windows 文件集成测试：正常退出 Steam 后运行 `dotnet run --project 
 结构：`src/SteamFusion.Core` 为路由与数据处理，`src/SteamFusion.Windows` 为 Windows 集成，`src/SteamFusion.App` 为 WPF UI 和托盘，`src/SteamFusion.Cli` 为命令行入口，`integrations/millennium` 为插件，`packaging` 为安装维护脚本。
 
 验证范围见 [VERIFICATION.md](VERIFICATION.md)，本地数据与提交注意事项见 [docs/PRIVACY.md](docs/PRIVACY.md)。图标生成说明保留在 `src/SteamFusion.App/Assets/ICON-DESIGN.md`。
+
+## 内置账号切换
+
+SteamFusion 在游戏退出、下载暂停和云同步确认后正常退出相关客户端，核对目标账号的 SteamID 与登录用户名，再更新普通 Steam 的 `loginusers.vdf` 选择标记以及当前 Windows 用户的 `AutoLoginUser` / `RememberPassword` 设置，随后启动 Steam 并核对实际登录身份。账号必须先在普通 Steam 中登录并记住；登录凭据失效或触发 Steam Guard 时，由用户在 Steam 中完成验证。
+
+此功能不读取或复制密码、登录令牌，不迁移沙盒登录状态。只修改选择标记，保留账号文件中的其他字段、注释和格式；修改前在原文件旁创建 `loginusers.vdf.steamfusion-*.bak`，文件损坏、账号不匹配或检测到 Steam 仍在运行时停止操作。正常写入错误会尝试恢复；若检测到 Steam 已重新启动或文件被其他程序修改，则保留备份并提示人工处理，避免覆盖正在使用的数据。
+
+旧配置中的 `wattExe` 字段会被忽略，保存配置时移除，账号与游戏路由不变。升级无需卸载 Watt Toolkit；SteamFusion 不再调用它，用户自行使用的加速等功能独立于本项目。

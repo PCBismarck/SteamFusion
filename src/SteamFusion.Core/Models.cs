@@ -32,7 +32,6 @@ public sealed record Configuration
 {
     public int SchemaVersion { get; init; } = 1;
     public string SteamExe { get; init; } = "";
-    public string WattExe { get; init; } = "";
     public string SandboxieStartExe { get; init; } = "";
     public string DefaultNativeAccountId { get; init; } = "";
     public bool KeepBothOnline { get; init; } = true;

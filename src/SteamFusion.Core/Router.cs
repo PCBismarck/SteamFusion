@@ -101,8 +101,8 @@ public sealed class Router(IRuntime runtime)
         }
         var stopped = await runtime.ObserveAsync(config, ct);
         if (stopped.HasUnmanagedInstances || stopped.Instances.Count != 0)
-            throw new InvalidOperationException("Steam 尚未完全退出，未执行 Watt 切号。");
-        SetPhase($"调用 Watt 切换到 {target.Name}");
+            throw new InvalidOperationException("Steam 尚未完全退出，未执行切号。");
+        SetPhase($"切换普通 Steam 到 {target.Name}");
         await runtime.SelectNativeAccountAsync(config, target, ct);
         var selected = await runtime.EnsureReadyAsync(config, target, "native", ct);
         if (!selected.Verified || selected.SteamId != target.SteamId)

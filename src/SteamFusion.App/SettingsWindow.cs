@@ -14,7 +14,7 @@ public sealed class SettingsWindow : Window
     private readonly Controller controller;
     private Configuration config;
     private readonly DiscoveryReport scan;
-    private readonly TextBox steam = new(), watt = new(), sandbox = new(), search = new();
+    private readonly TextBox steam = new(), sandbox = new(), search = new();
     private readonly ComboBox native = new(), account = new(), mode = new(), saves = new();
     private readonly ListBox selectedGame = new() { SelectedValuePath = "Value" };
     private readonly CheckBox enabled = new() { Content = "确认账号拥有游玩权限，启用此规则" };
@@ -38,7 +38,7 @@ public sealed class SettingsWindow : Window
         Ui.Apply(this);
         Title = "SteamFusion · 设置"; Width = 1120; Height = 800; MinWidth = 980; MinHeight = 680;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
-        steam.Text = config.SteamExe; watt.Text = config.WattExe; sandbox.Text = config.SandboxieStartExe;
+        steam.Text = config.SteamExe; sandbox.Text = config.SandboxieStartExe;
         foreach (var choice in new[] { native, account })
         { choice.ItemsSource = config.Accounts; choice.DisplayMemberPath = "Name"; choice.SelectedValuePath = "Id"; }
         native.SelectedValue = config.DefaultNativeAccountId;
@@ -123,7 +123,8 @@ public sealed class SettingsWindow : Window
     private UIElement ToolsPage()
     {
         var panel = new StackPanel(); var paths = new StackPanel(); paths.Children.Add(Ui.Heading("本机工具"));
-        AddPath(paths, "Steam 客户端", steam); AddPath(paths, "Watt Toolkit", watt, "Microsoft Store 版使用 store:WattToolkit，无需选择安装目录。"); AddPath(paths, "Sandboxie · Start.exe", sandbox);
+        paths.Children.Add(Ui.Text("账号切换已内置，使用 Steam 已记住的账号。", 12, true));
+        AddPath(paths, "Steam 客户端", steam); AddPath(paths, "Sandboxie · Start.exe", sandbox);
         var save = Ui.Button("保存设置", Save, true); save.HorizontalAlignment = HorizontalAlignment.Left; paths.Children.Add(save); panel.Children.Add(Ui.Card(paths));
         var advanced = new StackPanel(); advanced.Children.Add(Ui.Heading("游戏库与下载")); advanced.Children.Add(integrate); advanced.Children.Add(uninstalled);
         advanced.Children.Add(Ui.Text("已安装游戏保留 Steam 原生详情页。取消备用入口选项后，会移除自动生成的非 Steam 入口。", 12, true));
@@ -192,7 +193,7 @@ public sealed class SettingsWindow : Window
     private void Save()
     {
         if (controller.Busy) throw new InvalidOperationException("请等待当前操作结束再修改配置。");
-        var updated = config with { SteamExe = steam.Text.Trim(), WattExe = watt.Text.Trim(), SandboxieStartExe = sandbox.Text.Trim(),
+        var updated = config with { SteamExe = steam.Text.Trim(), SandboxieStartExe = sandbox.Text.Trim(),
             DefaultNativeAccountId = native.SelectedValue as string ?? "", KeepBothOnline = dual.IsChecked == true,
             IntegrateLibrary = integrate.IsChecked == true, UninstalledLibrary = uninstalled.IsChecked == true,
             SharedLibraryDownloads = File.Exists(Discovery.Store.ConfigPath) ? Discovery.Store.Load().SharedLibraryDownloads : config.SharedLibraryDownloads,

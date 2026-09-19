@@ -149,24 +149,27 @@ public sealed class WindowsRuntime(IUserInteraction interaction) : IRuntime
     public async Task SelectNativeAccountAsync(Configuration config, Account account, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
-        if (!Discovery.Scan().Accounts.Any(a => a.LoginName == account.LoginName && a.SteamId == account.SteamId))
-            throw new InvalidOperationException("目标账号不在 Steam 已记住的账号中，请先登录一次。");
-        if (config.WattExe == WattStore.Setting) WattStore.Activate("-clt", "steam", "-account", account.LoginName);
-        else
+        NativeMethods.RequireOutsideSandbox();
+        void RequireStopped()
         {
-            if (!File.Exists(config.WattExe)) throw new InvalidOperationException("未找到 Watt Toolkit，请在设置中选择其 EXE，商店版填写 store:WattToolkit。");
-            using var watt = Start(config.WattExe, "-clt", "steam", "-account", account.LoginName);
+            var processes = Process.GetProcessesByName("steam");
+            try { if (processes.Length > 0) throw new InvalidOperationException("Steam 尚未完全退出，未修改登录账号。"); }
+            finally { foreach (var process in processes) process.Dispose(); }
         }
-        // Watt may still be waiting for UAC. Do not race it by starting Steam ourselves.
-        var deadline = DateTimeOffset.UtcNow.AddSeconds(90);
+        using var key = Registry.CurrentUser.OpenSubKey(@"Software\Valve\Steam", writable: true)
+            ?? throw new InvalidOperationException("找不到 Steam 登录设置，请先在普通 Steam 登录一次。");
+        NativeAccountSelection.Select(config.SteamExe, account, key, RequireStopped);
+        RequireStopped();
+        using var started = Start(config.SteamExe);
+        var deadline = DateTimeOffset.UtcNow.AddSeconds(45);
         while (DateTimeOffset.UtcNow < deadline)
         {
             await Task.Delay(500, ct);
             var observed = await ObserveAsync(config, ct);
-            if (observed.HasUnmanagedInstances) throw new InvalidOperationException("Watt 切号期间出现未知实例。");
+            if (observed.HasUnmanagedInstances) throw new InvalidOperationException("切号期间出现未知 Steam 实例。");
             if (observed.Native is not null) return;
         }
-        throw new InvalidOperationException("Watt 尚未启动 Steam，请检查权限提示或手动完成切号。");
+        throw new InvalidOperationException("Steam 尚未启动，请检查客户端提示。登录失效时需在 Steam 中重新验证。");
     }
 
     public Task LaunchAsync(Configuration config, Instance instance, uint appId, CancellationToken ct)

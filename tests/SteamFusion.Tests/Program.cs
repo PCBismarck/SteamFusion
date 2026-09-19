@@ -21,7 +21,7 @@ Test("Unmanaged clients stop all routing", () => Throws(() => RoutePlanner.Plan(
 Test("Fixed save environment prevents accidental migration", () => Throws(() => RoutePlanner.Plan(config,
     game with { Mode = RunMode.NativeOnly, Saves = SaveMode.FixedEnvironment, FixedEnvironment = "Box_B" }, new([nativeA, boxB]))));
 Test("Duplicate account or AppID mappings rejected", () => { Throws(() => (config with { Games = [game, game] }).Validate()); Throws(() => (config with { Accounts = [a, a] }).Validate()); });
-Test("Shell metacharacters rejected in Watt account field", () => Throws(() => (config with { Accounts = [a with { LoginName = "a & whoami" }, b] }).Validate()));
+Test("Shell metacharacters rejected in account field", () => Throws(() => (config with { Accounts = [a with { LoginName = "a & whoami" }, b] }).Validate()));
 
 Async("Routed launch uses the correct instance without shutting down either client", async () =>
 {
@@ -36,7 +36,7 @@ Async("Exchange closes boxes before native, then chooses account before launchin
     Check((await router.LaunchAsync(cfg, game.AppId, Guid.NewGuid())).Success);
     Equal("confirm,stop:Box_B,stop:native,switch:b,ready:native,ready:Box_A,ready:native,launch:native:368340", string.Join(',', fake.Events));
 });
-Async("Running game blocks Watt and shutdown", async () =>
+Async("Running game blocks account selection and shutdown", async () =>
 {
     var fake = new Fake([nativeA with { RunningGames = [620] }, boxB]);
     Check(!(await new Router(fake).SwapAsync(config, "b", Guid.NewGuid())).Success); Equal(0, fake.Events.Count);
@@ -59,7 +59,7 @@ Async("A game started while a dialog was open blocks the exchange", async () =>
     Check(!(await new Router(fake).SwapAsync(config, "b", Guid.NewGuid())).Success);
     Equal("confirm", string.Join(',', fake.Events));
 });
-Async("Failure to close a client cannot call Watt", async () =>
+Async("Failure to close a client cannot select an account", async () =>
 {
     var fake = new Fake([nativeA, boxB]) { FailStop = true };
     Check(!(await new Router(fake).SwapAsync(config, "b", Guid.NewGuid())).Success);
@@ -209,6 +209,46 @@ Async("Download navigation is deduplicated and a running game prevents a require
     fake = new Fake([nativeA with { RunningGames = [570] }, boxB]);
     Check(!(await new Router(fake).OpenDownloadAsync(config, game.AppId, Guid.NewGuid())).Success);
     Check(!fake.Events.Any(e => e.StartsWith("switch:") || e.StartsWith("library:")));
+});
+
+
+const string loginFixture = "\uFEFF// unchanged comment\r\n\"users\"\r\n{\r\n\t\"76561198000000001\" { \"AccountName\" \"account_a\" \"MostRecent\" \"1\" \"Unknown\" { \"path\" \"C:\\\\Games\" } }\r\n\t\"76561198000000002\" { \"AccountName\" \"account_b\" \"mostrecent\" \"0\" \"RememberPassword\" \"0\" \"AllowAutoLogin\" \"0\" }\r\n}\r\n";
+Test("Built-in selection changes only flags and preserves all other VDF bytes", () =>
+{
+    var selected = SteamLoginUsers.Select(loginFixture, b);
+    Equal(loginFixture.Replace("\"MostRecent\" \"1\"", "\"MostRecent\" \"0\"")
+        .Replace("\"mostrecent\" \"0\"", "\"mostrecent\" \"1\"")
+        .Replace("\"RememberPassword\" \"0\"", "\"RememberPassword\" \"1\""), selected);
+    Equal(selected, SteamLoginUsers.Select(selected, b));
+});
+Test("Built-in selection adds missing flags without discarding fields", () =>
+{
+    var original = "\"users\" { \"76561198000000001\" { \"AccountName\" \"account_a\" \"Note\" \"} \\\"quoted\\\"\" } }";
+    var selected = SteamLoginUsers.Select(original, a);
+    var user = Vdf.Parse(selected).Children["users"].Children[a.SteamId];
+    Equal("1", user.Get("MostRecent")); Equal("1", user.Get("RememberPassword"));
+    Equal("} \"quoted\"", user.Get("Note")); Equal(selected, SteamLoginUsers.Select(selected, a));
+});
+Test("Built-in selection rejects unknown accounts and mismatched identity", () =>
+{
+    Throws(() => SteamLoginUsers.Select(loginFixture, b with { SteamId = "76561198999999999" }));
+    Throws(() => SteamLoginUsers.Select(loginFixture, b with { LoginName = "different" }));
+    Check(SteamLoginUsers.Select(loginFixture, b with { LoginName = "ACCOUNT_B" }).Contains("\"mostrecent\" \"1\""));
+});
+Test("Built-in selection rejects malformed and ambiguous account files", () =>
+{
+    foreach (var text in new[] { loginFixture[..^5], "users {", "users { users {} users {} }",
+        loginFixture.Replace("\"mostrecent\" \"0\"", "\"mostrecent\" \"0\" \"MostRecent\" \"1\""),
+        loginFixture.Replace("\"mostrecent\" \"0\"", "\"mostrecent\" {}"),
+        loginFixture.Replace("\"users\"", "\"users\" \"invalid\""),
+        loginFixture + "}", loginFixture.Replace("\"AccountName\" \"account_b\"", "\"AccountName\" {}") })
+        Throws(() => SteamLoginUsers.Select(text, b));
+});
+Test("Legacy Watt path is ignored while account and routing configuration survive", () =>
+{
+    var legacy = Json.Encode(config).Insert(1, "\"wattExe\":\"store:WattToolkit\",");
+    var migrated = Json.Decode<Configuration>(legacy); migrated.Validate();
+    Equal(Json.Encode(config), Json.Encode(migrated)); Check(!Json.Encode(migrated).Contains("wattExe"));
 });
 
 var failed = 0;
