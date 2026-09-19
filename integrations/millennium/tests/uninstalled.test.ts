@@ -14,6 +14,21 @@ test('name and numeric ID sorts are deterministic and never mutate the catalog',
     for (const value of [null, undefined, '', 'invalid', {}, 1]) assert.equal(librarySort(value), 'name-asc');
     assert.equal(librarySort('appid-desc'), 'appid-desc');
 });
+test('alphabetical sorting ignores case, uses letter rather than numeric order and preserves ties', () => {
+    const games = [
+        {...game(10), gameName:'zebra'}, {...game(20), gameName:'Banana'},
+        {...game(40), gameName:'apple'}, {...game(30), gameName:'APPLE'},
+        {...game(50), gameName:'Game 2'}, {...game(60), gameName:'Game 10'},
+    ];
+    assert.deepEqual(sortGames(games, 'alphabetical-asc').map(g=>g.appId), [30,40,20,60,50,10]);
+    assert.deepEqual(sortGames(games, 'alphabetical-desc').map(g=>g.appId), [10,50,60,20,30,40]);
+    assert.equal(librarySort('alphabetical-asc'), 'alphabetical-asc');
+    assert.equal(librarySort('alphabetical-desc'), 'alphabetical-desc');
+    const mixed = [{...game(1),gameName:'阿尔法'}, {...game(2),gameName:'Zebra'}];
+    assert.deepEqual(sortGames(mixed, 'alphabetical-asc').map(g=>g.appId), [2,1]);
+    assert.deepEqual(sortGames(mixed, 'name-asc').map(g=>g.appId), [1,2]);
+    assert.deepEqual(games.map(g=>g.appId), [10,20,40,30,50,60]);
+});
 test('virtual library shows only enabled foreign-account games not installed locally', () => {
     const games = [game(10),game(20),game(30,main),{...game(40),enabled:false},game(50),game(60)];
     const local = new Set([20]);

@@ -4,6 +4,8 @@ import { parseAppId } from './routing.ts';
 export const librarySorts = [
     { value: 'name-asc', label: '名称 · 升序' },
     { value: 'name-desc', label: '名称 · 降序' },
+    { value: 'alphabetical-asc', label: '字母 · A–Z' },
+    { value: 'alphabetical-desc', label: '字母 · Z–A' },
     { value: 'appid-asc', label: 'AppID · 从小到大' },
     { value: 'appid-desc', label: 'AppID · 从大到小' },
 ] as const;
@@ -12,11 +14,16 @@ export function librarySort(value: unknown): LibrarySort {
     return librarySorts.some(option => option.value === value) ? value as LibrarySort : 'name-asc';
 }
 const names = new Intl.Collator('zh-CN');
+const letters = new Intl.Collator('en', { sensitivity: 'base', numeric: false });
 /** Sort a copy of the complete result set before limiting the rendered cards. */
 export function sortGames(games: Mapping[], order: LibrarySort): Mapping[] {
     return [...games].sort((a, b) => {
         if (order === 'appid-asc') return a.appId - b.appId;
         if (order === 'appid-desc') return b.appId - a.appId;
+        if (order === 'alphabetical-asc' || order === 'alphabetical-desc') {
+            const byLetter = letters.compare(a.gameName ?? '', b.gameName ?? '');
+            return (order === 'alphabetical-desc' ? -byLetter : byLetter) || a.appId - b.appId;
+        }
         const byName = names.compare(a.gameName ?? '', b.gameName ?? '');
         return (order === 'name-desc' ? -byName : byName) || a.appId - b.appId;
     });

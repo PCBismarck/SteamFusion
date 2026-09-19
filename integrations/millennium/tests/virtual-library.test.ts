@@ -94,6 +94,13 @@ test('sort covers all pages and search results, survives reload and stays scoped
         assert.equal(doc.querySelector('select').value,'name-asc');
         model={...model,user:'76561198000000001'};view.open();
         assert.equal(doc.querySelector('select').value,'appid-desc');
+        select('alphabetical-asc');
+        assert.equal(titles()[0],'Game 1');assert.equal(titles()[1],'Game 10');
+        view.dispose();view=installVirtualLibrary(options);view.open();
+        assert.equal(doc.querySelector('select').value,'alphabetical-asc');
+        select('alphabetical-desc');assert.equal(titles()[0],'Game 99');
+        view.dispose();view=installVirtualLibrary(options);view.open();
+        assert.equal(doc.querySelector('select').value,'alphabetical-desc');
         assert.equal(model.games[0].appId,1);
     } finally {view.dispose();dom.window.close();}
 });
