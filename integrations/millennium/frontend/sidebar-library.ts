@@ -89,7 +89,7 @@ export const sidebarStyles = `
 .sfvl-side-body{padding-top:7px}.sfvl-side-body[hidden]{display:none}
 .sfvl-side-search{box-sizing:border-box;width:100%;min-width:0;padding:7px 9px;border:1px solid #394a5a;border-radius:3px;background:#171e27;color:#dce5ee;font:inherit;font-size:12px}
 .sfvl-side-count{font-size:11px;color:#8298aa;padding:6px 3px}
-.sfvl-side-list{display:block;max-height:min(32vh,340px);overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;border-bottom:1px solid #354250;padding-bottom:5px}
+.sfvl-side-list{display:block;max-height:min(32vh,340px);overflow:auto;overscroll-behavior:contain;border-bottom:1px solid #354250;padding-bottom:5px}
 .sfvl-side-game{box-sizing:border-box;display:block;width:100%;min-width:0;padding:6px 9px;border:0;border-left:2px solid transparent;background:transparent;color:#b8c6d4;font:inherit;font-size:13px;line-height:1.35;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
 .sfvl-side-game:hover{background:#ffffff0d;color:#fff}.sfvl-side-game[aria-current=page]{background:#32516b;color:#fff;border-left-color:#6bbdef}
 .sfvl-side-group button:focus-visible,.sfvl-side-search:focus-visible{outline:2px solid #81caff;outline-offset:-2px}

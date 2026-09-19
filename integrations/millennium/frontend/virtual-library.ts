@@ -182,6 +182,15 @@ export function installVirtualLibrary(options: {
     return { refresh, open: () => { refresh(); if (panel) open(); }, dispose: () => { disposed = true; unmount(); } };
 }
 const styles = `
+:is(.sfvl-side-list,.sfvl-scroll,.sfvl-detail){color-scheme:dark;scrollbar-width:auto;scrollbar-color:auto}
+:is(.sfvl-side-list,.sfvl-scroll,.sfvl-detail)::-webkit-scrollbar{width:8px;height:8px;background:transparent}
+:is(.sfvl-side-list,.sfvl-scroll,.sfvl-detail)::-webkit-scrollbar-track{background:transparent;border:0}
+:is(.sfvl-side-list,.sfvl-scroll,.sfvl-detail)::-webkit-scrollbar-thumb{background:#3c454f;border:1px solid transparent;border-radius:8px;background-clip:padding-box;min-height:28px}
+:is(.sfvl-side-list,.sfvl-scroll,.sfvl-detail):hover::-webkit-scrollbar-thumb{background-color:#505c69}
+:is(.sfvl-side-list,.sfvl-scroll,.sfvl-detail)::-webkit-scrollbar-thumb:hover{background-color:#6a7887}
+:is(.sfvl-side-list,.sfvl-scroll,.sfvl-detail)::-webkit-scrollbar-button{display:none;width:0;height:0}
+:is(.sfvl-side-list,.sfvl-scroll,.sfvl-detail)::-webkit-scrollbar-corner{background:transparent}
+@supports not selector(::-webkit-scrollbar){:is(.sfvl-side-list,.sfvl-scroll,.sfvl-detail){scrollbar-width:thin;scrollbar-color:#505c69 transparent}}
 .sfvl-sort{display:flex;align-items:center;gap:8px;color:#9eafbf;font-size:13px;white-space:nowrap}.sfvl-sort select{font:inherit;color:#e6edf5;background:#233345;border:1px solid #41566b;border-radius:4px;padding:10px 30px 10px 12px;cursor:pointer;color-scheme:dark;max-width:100%}.sfvl-sort select:focus-visible{outline:2px solid #81caff;outline-offset:2px}.sfvl-controls{flex-wrap:wrap}
 .sfvl-nav{display:block;box-sizing:border-box;width:calc(100% - 16px);margin:4px 8px 8px;padding:10px 12px;border:1px solid #405267;border-radius:4px;background:linear-gradient(110deg,#263b51,#23303f);color:#c9eaff;font:inherit;text-align:left;cursor:pointer;flex:none}
 .sfvl-nav:hover,.sfvl-nav[aria-expanded=true]{background:#304e69;color:#fff;border-color:#63b8ed}
