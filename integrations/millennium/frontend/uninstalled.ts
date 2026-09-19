@@ -1,6 +1,27 @@
 import type { Mapping } from './routing';
 import { parseAppId } from './routing.ts';
 
+export const librarySorts = [
+    { value: 'name-asc', label: '名称 · 升序' },
+    { value: 'name-desc', label: '名称 · 降序' },
+    { value: 'appid-asc', label: 'AppID · 从小到大' },
+    { value: 'appid-desc', label: 'AppID · 从大到小' },
+] as const;
+export type LibrarySort = typeof librarySorts[number]['value'];
+export function librarySort(value: unknown): LibrarySort {
+    return librarySorts.some(option => option.value === value) ? value as LibrarySort : 'name-asc';
+}
+const names = new Intl.Collator('zh-CN');
+/** Sort a copy of the complete result set before limiting the rendered cards. */
+export function sortGames(games: Mapping[], order: LibrarySort): Mapping[] {
+    return [...games].sort((a, b) => {
+        if (order === 'appid-asc') return a.appId - b.appId;
+        if (order === 'appid-desc') return b.appId - a.appId;
+        const byName = names.compare(a.gameName ?? '', b.gameName ?? '');
+        return (order === 'name-desc' ? -byName : byName) || a.appId - b.appId;
+    });
+}
+
 export function installationIds(value: unknown, now = Date.now()): Set<number> {
     const state = typeof value === 'string' ? JSON.parse(value) : value;
     if (!state || state.schemaVersion !== 1 || state.complete !== true || !Array.isArray(state.installed) ||
@@ -16,8 +37,7 @@ export function uninstalledGames(games: Mapping[], viewer: string | null, host: 
     if (!viewer || viewer !== host) return [];
     const local = new Set(installed);
     for (const app of visible) if (app.app_type !== 1073741824 && app.local_per_client_data?.installed === true) local.add(app.appid);
-    return games.filter(game => game.enabled && game.steamId !== viewer && game.gameName && !local.has(game.appId))
-        .sort((a, b) => a.gameName!.localeCompare(b.gameName!, 'zh-CN'));
+    return sortGames(games.filter(game => game.enabled && game.steamId !== viewer && game.gameName && !local.has(game.appId)), 'name-asc');
 }
 export function filterGames(games: Mapping[], query: string): Mapping[] {
     const search = query.trim().toLocaleLowerCase();

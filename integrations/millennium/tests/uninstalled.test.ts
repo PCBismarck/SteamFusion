@@ -1,8 +1,19 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { installationIds, uninstalledGames, filterGames, artworkUrl } from '../frontend/uninstalled.ts';
+import { installationIds, uninstalledGames, filterGames, artworkUrl, sortGames, librarySort } from '../frontend/uninstalled.ts';
 const main = '76561198000000001', other = '76561198000000002';
 const game = (appId: number, steamId = other) => ({ appId, steamId, enabled: true, mode: 'auto', gameName: `Game ${appId}` });
+test('name and numeric ID sorts are deterministic and never mutate the catalog', () => {
+    const games = [{...game(20), gameName:'Banana'}, {...game(100), gameName:'Apple'}, {...game(3), gameName:'Apple'}];
+    const ids = (order) => sortGames(games, order).map(g => g.appId);
+    assert.deepEqual(ids('name-asc'), [3,100,20]);
+    assert.deepEqual(ids('name-desc'), [20,3,100]);
+    assert.deepEqual(ids('appid-asc'), [3,20,100]);
+    assert.deepEqual(ids('appid-desc'), [100,20,3]);
+    assert.deepEqual(games.map(g=>g.appId), [20,100,3]);
+    for (const value of [null, undefined, '', 'invalid', {}, 1]) assert.equal(librarySort(value), 'name-asc');
+    assert.equal(librarySort('appid-desc'), 'appid-desc');
+});
 test('virtual library shows only enabled foreign-account games not installed locally', () => {
     const games = [game(10),game(20),game(30,main),{...game(40),enabled:false},game(50),game(60)];
     const local = new Set([20]);

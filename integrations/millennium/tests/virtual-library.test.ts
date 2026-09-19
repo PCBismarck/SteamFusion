@@ -63,3 +63,55 @@ test('scrolling loads additional batches without replacing cards, focus or detai
         view.dispose(); await tick(); assert.equal(doc.querySelectorAll('.sfvl-page,.sfvl-nav').length,0);
     } finally { view.dispose(); dom.window.close(); }
 });
+
+test('sort covers all pages and search results, survives reload and stays scoped to the viewer', async () => {
+    const dom = new JSDOM('<body><aside id="sidebar"><div class="native-nav"></div></aside></body>', {url:'https://steamloopback.host'});
+    const doc = dom.window.document;
+    globalThis.ResizeObserver = class { observe() {} disconnect() {} };
+    doc.querySelector('#sidebar').getBoundingClientRect = () => ({left:0,right:250,top:80,bottom:780,width:250,height:700});
+    let model = {enabled:true, user:'76561198000000001', loading:false,
+        games:Array.from({length:135},(_,i)=>({appId:i+1, steamId:'76561198000000002', enabled:true, mode:'auto', gameName:`Game ${i+1}`}))};
+    const options = {document:()=>doc, navigationClass:()=> 'native-nav', model:()=>model, refreshData:()=>{}, download:async()=>{}};
+    let view = installVirtualLibrary(options);
+    const titles = () => [...doc.querySelectorAll('.sfvl-card')].map(card=>card.title);
+    const select = value => {const node=doc.querySelector('select');node.value=value;node.dispatchEvent(new dom.window.Event('change'));};
+    try {
+        view.open(); select('appid-desc');
+        assert.deepEqual(titles(),Array.from({length:60},(_,i)=>`Game ${135-i}`));
+        const scroll=doc.querySelector('.sfvl-scroll');
+        Object.defineProperty(scroll,'clientHeight',{value:500});
+        Object.defineProperty(scroll,'scrollHeight',{get:()=>doc.querySelectorAll('.sfvl-card').length*50});
+        scroll.scrollTop=2500;scroll.dispatchEvent(new dom.window.Event('scroll'));
+        await new Promise(resolve=>setTimeout(resolve,45));
+        assert.deepEqual(titles(),Array.from({length:120},(_,i)=>`Game ${135-i}`));
+        const search=doc.querySelector('input');search.value='13';search.dispatchEvent(new dom.window.Event('input'));
+        assert.deepEqual(titles(),['Game 135','Game 134','Game 133','Game 132','Game 131','Game 130','Game 113','Game 13']);
+        model={...model,games:model.games.filter(g=>g.appId!==134)};view.refresh();
+        assert.equal(doc.querySelector('select').value,'appid-desc');assert.equal(titles().includes('Game 134'),false);
+        view.dispose(); view=installVirtualLibrary(options); view.open();
+        assert.equal(doc.querySelector('select').value,'appid-desc');assert.equal(titles()[0],'Game 135');
+        model={...model,user:'76561198000000003'};view.open();
+        assert.equal(doc.querySelector('select').value,'name-asc');
+        model={...model,user:'76561198000000001'};view.open();
+        assert.equal(doc.querySelector('select').value,'appid-desc');
+        assert.equal(model.games[0].appId,1);
+    } finally {view.dispose();dom.window.close();}
+});
+
+test('invalid saved sort and unavailable storage fall back without breaking the page', () => {
+    const dom=new JSDOM('<body><aside id="sidebar"><div class="native-nav"></div></aside></body>',{url:'https://steamloopback.host'});
+    const doc=dom.window.document;
+    globalThis.ResizeObserver=class {observe(){}disconnect(){}};
+    doc.querySelector('#sidebar').getBoundingClientRect=()=>({left:0,right:250,top:80,bottom:780,width:250,height:700});
+    const model={enabled:true,user:'76561198000000001',loading:false,games:[{appId:3,steamId:'76561198000000002',enabled:true,mode:'auto',gameName:'Example'}]};
+    const options={document:()=>doc,navigationClass:()=> 'native-nav',model:()=>model,refreshData:()=>{},download:async()=>{}};
+    dom.window.localStorage.setItem(`steamfusion.uninstalled.sort.v1:${model.user}`,'bad-mode');
+    let view=installVirtualLibrary(options);
+    try {
+        view.open();assert.equal(doc.querySelector('select').value,'name-asc');view.dispose();
+        Object.defineProperty(dom.window,'localStorage',{get(){throw new Error('Storage denied');}});
+        view=installVirtualLibrary(options);view.open();
+        const select=doc.querySelector('select');select.value='appid-desc';select.dispatchEvent(new dom.window.Event('change'));
+        assert.equal(select.value,'appid-desc');assert.equal(doc.querySelectorAll('.sfvl-card').length,1);
+    } finally {view.dispose();dom.window.close();}
+});

@@ -1,5 +1,6 @@
 import type { Mapping } from './routing';
-import { artworkUrl, filterGames } from './uninstalled.ts';
+import { artworkUrl, filterGames, librarySort, librarySorts, sortGames } from './uninstalled.ts';
+import type { LibrarySort } from './uninstalled.ts';
 
 export type VirtualLibraryModel = { enabled: boolean; user: string | null; games: Mapping[]; loading: boolean; error?: string };
 /** Mount only our own DOM; no shortcuts, collection records or Steam ownership data are written. */
@@ -11,6 +12,13 @@ export function installVirtualLibrary(options: {
     let style: HTMLStyleElement | undefined, grid: HTMLElement | undefined, summary: HTMLElement | undefined;
     let status: HTMLElement | undefined, search: HTMLInputElement | undefined, more: HTMLElement | undefined;
     let drawer: HTMLElement | undefined, sidebar: HTMLElement | undefined;
+    let sort: HTMLSelectElement | undefined, order: LibrarySort = 'name-asc';
+    const sortKey = () => `steamfusion.uninstalled.sort.v1:${previousUser ?? 'anonymous'}`;
+    function loadSort() {
+        try { order = librarySort(doc?.defaultView?.localStorage.getItem(sortKey())); }
+        catch { order = 'name-asc'; }
+        if (sort) sort.value = order;
+    }
     let shown = false, disposed = false, query = '', limit = 60, lastKey = '', pending = false, previousUser: string | null = null;
     let observer: ResizeObserver | undefined;
     let scroll: HTMLElement | undefined, renderedKey = '';
@@ -79,7 +87,7 @@ export function installVirtualLibrary(options: {
     }
     function render(append = false) {
         if (!grid || !shown) return;
-        const model = options.model(); const matches = filterGames(model.games, query);
+        const model = options.model(); const matches = sortGames(filterGames(model.games, query), order);
         const key = JSON.stringify(matches.map(g => [g.appId, g.gameName, g.accountName]));
         if (key !== renderedKey || model.loading || model.error) append = false;
         const start = append ? grid.children.length : 0;
@@ -106,7 +114,7 @@ export function installVirtualLibrary(options: {
         cancelLoad(); scroll?.removeEventListener('scroll', scheduleLoad); scroll = undefined; renderedKey = '';
         observer?.disconnect(); observer = undefined; doc?.removeEventListener('pointerdown', outside, true); doc?.removeEventListener('keydown', keyboard);
         doc?.defaultView?.removeEventListener('resize', position); button?.remove(); panel?.remove(); style?.remove();
-        button = undefined; panel = undefined; sidebar = undefined; shown = false; lastKey = '';
+        button = undefined; panel = undefined; sidebar = undefined; sort = undefined; shown = false; lastKey = '';
     }
     function mount(navigation: HTMLElement) {
         sidebar = navigation.parentElement ?? undefined; if (!sidebar) return;
@@ -119,7 +127,16 @@ export function installVirtualLibrary(options: {
         head.append(title, action('返回游戏库', () => close(), 'sfvl-secondary'));
         const controls = el('div', 'sfvl-controls'); search = el('input'); search.type = 'search'; search.placeholder = '搜索游戏名称或 AppID'; search.setAttribute('aria-label', '搜索另一账号未安装游戏');
         search.value = query; search.addEventListener('input', () => { cancelLoad(); query = search!.value; limit = 60; if (scroll) scroll.scrollTop = 0; render(); });
-        controls.append(search, action('刷新', () => { options.refreshData(); status!.textContent = '正在刷新安装状态…'; }, 'sfvl-secondary'));
+        const sortLabel = el('label', 'sfvl-sort', '排序'); sort = el('select'); sort.setAttribute('aria-label', '未安装游戏排序');
+        for (const item of librarySorts) { const option = el('option', '', item.label); option.value = item.value; sort.append(option); }
+        sort.value = order;
+        sort.addEventListener('change', () => {
+            cancelLoad(); order = librarySort(sort!.value); sort!.value = order;
+            try { doc?.defaultView?.localStorage.setItem(sortKey(), order); } catch { /* Sorting still works when storage is unavailable. */ }
+            limit = 60; if (scroll) scroll.scrollTop = 0; render();
+        });
+        sortLabel.append(sort);
+        controls.append(search, sortLabel, action('刷新', () => { options.refreshData(); status!.textContent = '正在刷新安装状态…'; }, 'sfvl-secondary'));
         status = el('p', 'sfvl-status'); status.setAttribute('role', 'status');
         scroll = el('div', 'sfvl-scroll'); grid = el('div', 'sfvl-grid'); more = el('p', 'sfvl-more'); more.setAttribute('role', 'status'); scroll.append(grid, more);
         scroll.addEventListener('scroll', scheduleLoad, { passive: true });
@@ -130,8 +147,11 @@ export function installVirtualLibrary(options: {
     function refresh() {
         if (disposed) return;
         const next = options.document(); const model = options.model();
-        if (next !== doc) { unmount(); doc = next; }
-        if (model.user !== previousUser) { close(); query = ''; limit = 60; previousUser = model.user; }
+        const documentChanged = next !== doc;
+        if (documentChanged) { unmount(); doc = next; }
+        const userChanged = model.user !== previousUser;
+        if (userChanged) { close(); query = ''; limit = 60; previousUser = model.user; if (search) search.value = ''; }
+        if (documentChanged || userChanged) loadSort();
         if (!doc?.body || !model.enabled) { unmount(); return; }
         const cls = options.navigationClass(); const navigation = cls ? doc.getElementsByClassName(cls)[0] as HTMLElement | undefined : undefined;
         if (!navigation) { unmount(); return; }
@@ -147,8 +167,9 @@ export function installVirtualLibrary(options: {
     return { refresh, open: () => { refresh(); if (panel) open(); }, dispose: () => { disposed = true; unmount(); } };
 }
 const styles = `
+.sfvl-sort{display:flex;align-items:center;gap:8px;color:#9eafbf;font-size:13px;white-space:nowrap}.sfvl-sort select{font:inherit;color:#e6edf5;background:#233345;border:1px solid #41566b;border-radius:4px;padding:10px 30px 10px 12px;cursor:pointer;color-scheme:dark;max-width:100%}.sfvl-sort select:focus-visible{outline:2px solid #81caff;outline-offset:2px}.sfvl-controls{flex-wrap:wrap}
 .sfvl-nav{display:block;box-sizing:border-box;width:calc(100% - 16px);margin:4px 8px 8px;padding:10px 12px;border:1px solid #405267;border-radius:4px;background:linear-gradient(110deg,#263b51,#23303f);color:#c9eaff;font:inherit;text-align:left;cursor:pointer;flex:none}
 .sfvl-nav:hover,.sfvl-nav[aria-expanded=true]{background:#304e69;color:#fff;border-color:#63b8ed}
 .sfvl-page{position:fixed;z-index:20;box-sizing:border-box;display:flex;flex-direction:column;overflow:hidden;background:radial-gradient(ellipse at 80% 0,#243d53 0,transparent 55%),#18212d;color:#e6edf5;font-family:inherit;isolation:isolate}
-.sfvl-page[hidden]{display:none}.sfvl-page *{box-sizing:border-box}.sfvl-page button,.sfvl-page input{font:inherit}.sfvl-page button{cursor:pointer}.sfvl-page button:focus-visible,.sfvl-nav:focus-visible{outline:2px solid #81caff;outline-offset:2px}.sfvl-header{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:28px 28px 12px}.sfvl-eyebrow{font-size:10px;letter-spacing:2px;color:#74b8d7}.sfvl-header h1{font-size:28px;font-weight:500;margin:9px 0}.sfvl-muted{color:#9eafbf;font-size:13px;margin:8px 0}.sfvl-controls{display:flex;gap:10px;padding:4px 28px 8px}.sfvl-controls input{min-width:0;flex:1;background:#111a25;border:1px solid #34485a;border-radius:5px;padding:11px 14px;color:#e6edf5;outline:none}.sfvl-controls input:focus{border-color:#67b8e7}.sfvl-secondary{border:1px solid #41566b;border-radius:4px;background:#2b3b4d;color:#cdddea;padding:9px 14px;white-space:nowrap}.sfvl-secondary:hover{background:#3a5168}.sfvl-status{font-size:12px;color:#9fc9de;margin:0;padding:0 28px 10px;min-height:10px}.sfvl-scroll{overflow:auto;flex:1;padding:8px 28px 28px;min-height:0}.sfvl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(145px,1fr));gap:20px 16px;align-content:start}.sfvl-card{padding:0;border:0;min-width:0;border-radius:6px;overflow:hidden;background:#223041;color:inherit;text-align:left;box-shadow:0 6px 15px #0003;transition:transform .14s,box-shadow .14s}.sfvl-card:hover{transform:translateY(-3px);box-shadow:0 8px 22px #0005}.sfvl-art{aspect-ratio:2/3;position:relative;background:linear-gradient(145deg,#3c5b73,#152030);overflow:hidden}.sfvl-art img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}.sfvl-placeholder{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:18px;color:#c4d6e8;font-size:19px;line-height:1.5;text-align:center}.sfvl-art img.sfvl-fallback{object-fit:contain;background:#182330}.sfvl-card-meta{padding:11px 12px;display:flex;flex-direction:column;gap:6px}.sfvl-card-meta strong{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.sfvl-card-meta span{font-size:11px;color:#91b6ce}.sfvl-more{display:block;margin:24px auto 0;text-align:center;color:#91b6ce;font-size:12px}.sfvl-more[hidden]{display:none}.sfvl-empty{grid-column:1/-1;color:#a4b5c6;padding:40px 10px;text-align:center;line-height:1.8}.sfvl-detail{position:absolute;inset:0 0 0 auto;width:min(390px,100%);z-index:2;background:#1b2938;border-left:1px solid #415164;box-shadow:-18px 0 70px #0008;overflow:auto}.sfvl-hero{height:190px;position:relative;background:#273e53}.sfvl-hero img{width:100%;height:100%;object-fit:cover}.sfvl-dismiss{position:absolute;top:12px;right:12px;border:0;border-radius:50%;width:32px;height:32px;background:#111c29dc;color:#fff;font-size:22px!important}.sfvl-detail-body{padding:26px}.sfvl-detail h2{font-size:25px;line-height:1.4;margin:12px 0 6px}.sfvl-primary{display:block;width:100%;margin:26px 0 18px;border:0;border-radius:4px;padding:13px;background:linear-gradient(100deg,#2a94c8,#3376c9);color:white;font-weight:600!important}.sfvl-primary:hover{filter:brightness(1.15)}.sfvl-primary:disabled{opacity:.5;cursor:wait}.sfvl-note{font-size:13px;line-height:1.8;color:#9cadbd}.sfvl-appid{display:block;margin-top:30px;color:#718ba0;font-size:11px;letter-spacing:1px}
+.sfvl-page[hidden]{display:none}.sfvl-page *{box-sizing:border-box}.sfvl-page button,.sfvl-page input{font:inherit}.sfvl-page button{cursor:pointer}.sfvl-page button:focus-visible,.sfvl-nav:focus-visible{outline:2px solid #81caff;outline-offset:2px}.sfvl-header{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:28px 28px 12px}.sfvl-eyebrow{font-size:10px;letter-spacing:2px;color:#74b8d7}.sfvl-header h1{font-size:28px;font-weight:500;margin:9px 0}.sfvl-muted{color:#9eafbf;font-size:13px;margin:8px 0}.sfvl-controls{display:flex;gap:10px;padding:4px 28px 8px}.sfvl-controls input{min-width:0;flex:1 1 180px;background:#111a25;border:1px solid #34485a;border-radius:5px;padding:11px 14px;color:#e6edf5;outline:none}.sfvl-controls input:focus{border-color:#67b8e7}.sfvl-secondary{border:1px solid #41566b;border-radius:4px;background:#2b3b4d;color:#cdddea;padding:9px 14px;white-space:nowrap}.sfvl-secondary:hover{background:#3a5168}.sfvl-status{font-size:12px;color:#9fc9de;margin:0;padding:0 28px 10px;min-height:10px}.sfvl-scroll{overflow:auto;flex:1;padding:8px 28px 28px;min-height:0}.sfvl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(145px,1fr));gap:20px 16px;align-content:start}.sfvl-card{padding:0;border:0;min-width:0;border-radius:6px;overflow:hidden;background:#223041;color:inherit;text-align:left;box-shadow:0 6px 15px #0003;transition:transform .14s,box-shadow .14s}.sfvl-card:hover{transform:translateY(-3px);box-shadow:0 8px 22px #0005}.sfvl-art{aspect-ratio:2/3;position:relative;background:linear-gradient(145deg,#3c5b73,#152030);overflow:hidden}.sfvl-art img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}.sfvl-placeholder{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:18px;color:#c4d6e8;font-size:19px;line-height:1.5;text-align:center}.sfvl-art img.sfvl-fallback{object-fit:contain;background:#182330}.sfvl-card-meta{padding:11px 12px;display:flex;flex-direction:column;gap:6px}.sfvl-card-meta strong{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.sfvl-card-meta span{font-size:11px;color:#91b6ce}.sfvl-more{display:block;margin:24px auto 0;text-align:center;color:#91b6ce;font-size:12px}.sfvl-more[hidden]{display:none}.sfvl-empty{grid-column:1/-1;color:#a4b5c6;padding:40px 10px;text-align:center;line-height:1.8}.sfvl-detail{position:absolute;inset:0 0 0 auto;width:min(390px,100%);z-index:2;background:#1b2938;border-left:1px solid #415164;box-shadow:-18px 0 70px #0008;overflow:auto}.sfvl-hero{height:190px;position:relative;background:#273e53}.sfvl-hero img{width:100%;height:100%;object-fit:cover}.sfvl-dismiss{position:absolute;top:12px;right:12px;border:0;border-radius:50%;width:32px;height:32px;background:#111c29dc;color:#fff;font-size:22px!important}.sfvl-detail-body{padding:26px}.sfvl-detail h2{font-size:25px;line-height:1.4;margin:12px 0 6px}.sfvl-primary{display:block;width:100%;margin:26px 0 18px;border:0;border-radius:4px;padding:13px;background:linear-gradient(100deg,#2a94c8,#3376c9);color:white;font-weight:600!important}.sfvl-primary:hover{filter:brightness(1.15)}.sfvl-primary:disabled{opacity:.5;cursor:wait}.sfvl-note{font-size:13px;line-height:1.8;color:#9cadbd}.sfvl-appid{display:block;margin-top:30px;color:#718ba0;font-size:11px;letter-spacing:1px}
 `;
