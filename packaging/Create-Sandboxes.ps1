@@ -53,6 +53,13 @@ foreach ($sfAccount in $sfConfig.accounts) {
         }
     }
     Set-SFValue $sfBox 'AutoDelete' 'n'
+    # Steam retries unavailable service IPC and can stall library navigation.
+    # Start a separate service inside each box; do not open the host service pipe.
+    if (Get-Service -Name 'Steam Client Service' -ErrorAction SilentlyContinue) {
+        Add-SFValue $sfBox 'StartService' 'Steam Client Service'
+    } else {
+        Write-Warning 'Steam Client Service is not installed. Repair the native Steam installation if sandbox loading is slow.'
+    }
     Add-SFValue $sfBox 'OpenPipePath' ('SteamFusion.Cli.exe,\Device\NamedPipe\' + $sfPipe)
     Add-SFValue $sfBox 'OpenPipePath' (Join-Path $sfState ('signals\' + $sfBox + '.json*'))
     $sfSteamRoot = Split-Path -Parent $sfConfig.steamExe
