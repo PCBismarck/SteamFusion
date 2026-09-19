@@ -66,8 +66,20 @@ foreach ($sfAccount in $sfConfig.accounts) {
     if ((Test-Path (Join-Path $sfSteamRoot 'millennium\lib\millennium.dll')) -and
         (Test-Path (Join-Path $sfSteamRoot 'wsock32.dll'))) {
         # Millennium 3.4.1 aborts inside the tested Sandboxie environment.
-        # Hide only its Steam-local loader in these boxes; Windows resolves the system WSOCK32.
+        # Hide the main loader in these boxes; Windows resolves the system WSOCK32.
         Add-SFValue $sfBox 'ClosedFilePath' ('steam.exe,' + (Join-Path $sfSteamRoot 'wsock32.dll'))
+    }
+    # The separate CEF loader must also be hidden when its Millennium backend is
+    # absent. Otherwise local images/fonts can each wait 500 ms for initialization.
+    $sfCefRoot = Join-Path $sfSteamRoot 'bin\cef'
+    if (Test-Path -LiteralPath $sfCefRoot -PathType Container) {
+        foreach ($sfCefDirectory in Get-ChildItem -LiteralPath $sfCefRoot -Directory) {
+            $sfLoopbackLoader = Join-Path $sfCefDirectory.FullName 'VERSION.dll'
+            if ((Test-Path -LiteralPath $sfLoopbackLoader -PathType Leaf) -and
+                ([Diagnostics.FileVersionInfo]::GetVersionInfo($sfLoopbackLoader).FileDescription -match 'Millennium')) {
+                Add-SFValue $sfBox 'ClosedFilePath' ('steamwebhelper.exe,' + $sfLoopbackLoader)
+            }
+        }
     }
     Write-Host (($sfAccount.name) + ' -> ' + $sfBox)
 }
