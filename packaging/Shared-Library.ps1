@@ -14,9 +14,9 @@ $sfStart=$sfConfig.sandboxieStartExe
 $sfIni=Join-Path (Split-Path $sfStart) 'SbieIni.exe'
 $sfIniPath=Join-Path $env:WINDIR 'Sandboxie.ini'
 if(!(Test-Path $sfIni)){throw 'Sandboxie configuration tool is missing.'}
-$sfStatus=(& (Join-Path $sfRoot 'SteamFusion.Cli.exe') status | Out-String | ConvertFrom-Json)
+$sfStatus=(& (Join-Path $sfRoot 'App\SteamFusion.Cli.exe') status | Out-String | ConvertFrom-Json)
 if($sfStatus.code -eq 'busy'){throw 'Wait for the current SteamFusion operation to finish.'}
-$sfBackup=Join-Path $sfRoot ('Backups\shared-library-'+(Get-Date -Format 'yyyyMMdd-HHmmssfff'))
+$sfBackup=Join-Path $sfRoot ('Data\Backups\shared-library-'+(Get-Date -Format 'yyyyMMdd-HHmmssfff'))
 New-Item -ItemType Directory -Path $sfBackup -Force | Out-Null
 Copy-Item -LiteralPath $sfIniPath -Destination (Join-Path $sfBackup 'Sandboxie.ini')
 Copy-Item -LiteralPath $sfConfigPath -Destination (Join-Path $sfBackup 'config.json')

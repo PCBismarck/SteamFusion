@@ -10,8 +10,12 @@ namespace SteamFusion.App;
 
 internal sealed class ExportPage : Grid
 {
+    private static string ReleaseDirectory =>
+        string.Equals(new DirectoryInfo(AppContext.BaseDirectory).Name, "App", StringComparison.OrdinalIgnoreCase)
+            ? Directory.GetParent(Path.TrimEndingDirectorySeparator(AppContext.BaseDirectory))!.FullName
+            : AppContext.BaseDirectory;
     private readonly ComboBox account = new() { DisplayMemberPath = "Name", SelectedValuePath = "Id" };
-    private readonly TextBox destination = new() { Text = Path.Combine(AppContext.BaseDirectory, "Exports") };
+    private readonly TextBox destination = new() { Text = Path.Combine(ReleaseDirectory, "Data", "Exports") };
     private readonly TextBlock status = Ui.Text("点击“读取记录”查看本机数据覆盖情况。", 13, true);
     private readonly StackPanel preview = new();
     private readonly Button read, export, cancel, open;

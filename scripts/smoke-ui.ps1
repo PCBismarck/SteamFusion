@@ -34,6 +34,6 @@ public static class SFWindowCapture {
 }
 $sfPattern = $sfWindow.GetCurrentPattern([System.Windows.Automation.WindowPattern]::Pattern)
 $sfPattern.Close()
-& (Join-Path $ReleaseDirectory 'SteamFusion.Cli.exe') status
+& (Join-Path $ReleaseDirectory 'App\SteamFusion.Cli.exe') status
 if ($LASTEXITCODE -ne 0) { throw 'Controller stopped when settings window closed.' }
 Write-Host 'PASS controller survives settings window close.'

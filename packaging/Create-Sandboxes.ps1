@@ -7,7 +7,7 @@ if (!$DataRoot) { $DataRoot = Join-Path $sfRoot 'Sandboxes' }
 $OutputEncoding = [Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
 $sfState = Join-Path $env:LOCALAPPDATA 'SteamFusion'
 $sfConfig = Get-Content (Join-Path $sfState 'config.json') -Raw -Encoding UTF8 | ConvertFrom-Json
-$sfCli = Join-Path $sfRoot 'SteamFusion.Cli.exe'
+$sfCli = Join-Path $sfRoot 'App\SteamFusion.Cli.exe'
 $sfStart = $sfConfig.sandboxieStartExe
 $sfIniTool = Join-Path (Split-Path $sfStart) 'SbieIni.exe'
 if (!(Test-Path $sfStart) -or !(Test-Path $sfIniTool)) { throw 'Set the installed Sandboxie Start.exe path in SteamFusion first.' }
@@ -18,7 +18,7 @@ $sfBefore = [IO.File]::ReadAllText($SandboxieIni)
 foreach ($sfAccount in $sfConfig.accounts) {
     if ($sfAccount.sandboxName -notmatch '^[A-Za-z][A-Za-z0-9_]{0,31}$') { throw 'Invalid sandbox name.' }
 }
-$sfBackups = Join-Path $sfRoot 'Backups'
+$sfBackups = Join-Path $sfRoot 'Data\Backups'
 New-Item -ItemType Directory -Path $sfBackups -Force | Out-Null
 $sfBackup = Join-Path $sfBackups ('Sandboxie-before-create-' + (Get-Date -Format 'yyyyMMdd-HHmmssfff') + '.ini')
 Copy-Item -LiteralPath $SandboxieIni -Destination $sfBackup

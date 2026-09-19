@@ -24,6 +24,7 @@ artifacts/
 *.pfx
 *.p12
 # Personal Steam / SteamFusion state (never publish)
+/[Dd]ata/
 [Bb]ackups/
 [Dd]iagnostics/
 [Ee]xports/

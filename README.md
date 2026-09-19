@@ -32,21 +32,38 @@ bash scripts/publish-wsl.sh
 # 若宿主缺少 ICU，可设置 DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1。
 ```
 
-脚本运行核心和插件测试，并生成 `artifacts/win-x64`。请保留整个发布目录，包括运行时 DLL、Assets、Scripts 和 Millennium 子目录；不要只复制 EXE。
+脚本运行核心和插件测试，并生成 `artifacts/win-x64`。请保留整个发布目录，包括 App、Scripts 等子目录；不要只复制 EXE。
+
+## 发布目录
+
+```text
+SteamFusion/
+├── SteamFusion.lnk       日常启动入口（Windows 脚本生成）
+├── 开始使用.txt          简短使用说明
+├── App/                 程序、运行时、图标和 Millennium 插件包
+├── Scripts/             安装、沙盒管理与备用启动脚本
+├── Docs/                项目说明、验证记录、源码包和校验清单
+├── Data/                Backups、Diagnostics、Exports（本机数据）
+└── Sandboxes/           持久沙盒数据，请勿删除或随意移动
+```
+
+双击根目录的 **SteamFusion** 快捷方式即可打开设置。快捷方式丢失或移动了发布文件夹时，运行 `Scripts/Start.cmd` 也可以启动；先退出托盘后台，再运行 `Scripts/Register-Paths.cmd` 可重新注册插件路径并生成快捷方式。纯 Linux 构建不生成 Windows 快捷方式，首次在 Windows 上安装时生成。实际 EXE 位于 `App/SteamFusion.exe`，必须和同目录运行文件一起保留。
+
+本机账号配置仍在 `%LOCALAPPDATA%\SteamFusion`；整理发布目录不会迁移账号或游戏存档。`Data` 和 `Sandboxes` 不属于公开源码。
 
 ## 首次配置
 
 1. 安装 Steam 和 Sandboxie-Plus。若需要原生库按钮集成，还需安装支持 Starlight 插件的 Millennium。发布包中的 `Scripts/Dependencies.cmd` 提供安装页面入口。
 2. 在普通 Steam 中分别登录并记住两个账号，然后正常退出 Steam。运行 `Scripts/Install.cmd`，初始化本机配置、注册控制器路径、生成快捷方式，并在检测到 Millennium 时安装插件。
-3. 打开 `SteamFusion.exe`，核对检测到的两个账号、默认普通账号和工具路径。账号切换由 SteamFusion 内置处理，无需填写切号工具路径。当前账号初始化取 Steam 记住的前两个账号，务必核对；需要调整账号列表时先退出后台，再编辑 `%LOCALAPPDATA%\SteamFusion\config.json`。
+3. 打开根目录的 `SteamFusion.lnk`，核对检测到的两个账号、默认普通账号和工具路径。账号切换由 SteamFusion 内置处理，无需填写切号工具路径。当前账号初始化取 Steam 记住的前两个账号，务必核对；需要调整账号列表时先退出后台，再编辑 `%LOCALAPPDATA%\SteamFusion\config.json`。
 4. 运行 `Scripts/Create-Sandboxes.cmd` 创建持久沙盒。它会备份 Sandboxie 配置，并为新沙盒设置发布目录下的 `Sandboxes` 数据位置；已有沙盒的数据不会自动迁移。
 5. 分别打开沙盒 Steam，核对并登录相应账号，完成 Steam Guard。沙盒名称不能证明实际登录身份；SteamFusion 不处理账号密码。
 6. 在普通 Steam 的 Millennium 设置中启用 SteamFusion。让每个账号分别在普通客户端完成库加载，再通过“导入游戏库”导入可访问游戏，或手动添加 AppID。导入保留已有规则；家庭共享访问不视为直接购买。
 7. 核对游戏账号与存档策略后启用规则。初始化附带的 CrossCode 条目默认禁用，仅作候选示例，不代表账号拥有该游戏。
 
-`Launchers/SteamFusion.lnk` 打开设置；`Small Steam.lnk` 与 `Main Steam.lnk` 均为沙盒 Steam 入口。普通客户端使用原有 Steam 快捷方式。快捷方式只选择环境，不保证 Steam 自动登录的账号。
+根目录的 `SteamFusion.lnk` 打开设置；`Scripts/Launchers/Small Steam.lnk` 与 `Main Steam.lnk` 均为沙盒 Steam 入口。普通客户端使用原有 Steam 快捷方式。快捷方式只选择环境，不保证 Steam 自动登录的账号。
 
-可运行 `Scripts/Install.ps1 -Startup` 注册 Windows 登录时启动后台。`SteamFusion.exe --agent` 仅启动后台和托盘。图标可能被 Windows 放在任务栏的隐藏图标区域；双击打开设置，右键退出。普通最小化按钮仍缩到任务栏。退出控制器不会关闭已运行的 Steam 或游戏。
+可运行 `Scripts/Install.ps1 -Startup` 注册 Windows 登录时启动后台。`App/SteamFusion.exe --agent` 仅启动后台和托盘。图标可能被 Windows 放在任务栏的隐藏图标区域；双击打开设置，右键退出。普通最小化按钮仍缩到任务栏。退出控制器不会关闭已运行的 Steam 或游戏。
 
 ## 日常使用
 
@@ -89,8 +106,8 @@ bash scripts/publish-wsl.sh
 “数据导出”页面可选择全部或单个账号，读取本机数据并生成 `games.csv`、`achievements.csv`、`data.json` 和说明文件。CLI 也支持：
 
 ```powershell
-.\SteamFusion.Cli.exe export-data 'E:\MySteamExports'
-.\SteamFusion.Cli.exe export-data 'E:\MySteamExports' account1
+.\App\SteamFusion.Cli.exe export-data 'E:\MySteamExports'
+.\App\SteamFusion.Cli.exe export-data 'E:\MySteamExports' account1
 ```
 
 数据来自普通及已配置沙盒的 Steam 本地缓存。同一账号的多份时长按缓存快照选择，不累加；缺失值保持未知。成就保留汇总和可读取的明细，标记完整性。缓存可能陈旧或不完整，当前没有联网补齐功能，文件修改时间也不是服务器同步时间。

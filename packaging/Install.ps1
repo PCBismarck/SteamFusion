@@ -2,8 +2,8 @@
 param([switch]$Startup, [switch]$NoStart)
 $ErrorActionPreference = 'Stop'
 $sfRoot = Split-Path -Parent $PSScriptRoot
-$sfCli = Join-Path $sfRoot 'SteamFusion.Cli.exe'
-$sfApp = Join-Path $sfRoot 'SteamFusion.exe'
+$sfCli = Join-Path $sfRoot 'App\SteamFusion.Cli.exe'
+$sfApp = Join-Path $sfRoot 'App\SteamFusion.exe'
 $sfData = Join-Path $env:LOCALAPPDATA 'SteamFusion'
 $sfUtf8 = New-Object System.Text.UTF8Encoding($false)
 if (!(Test-Path $sfApp) -or !(Test-Path $sfCli)) { throw 'Keep this script in the Scripts subfolder of the complete Windows release.' }
@@ -22,7 +22,7 @@ if (Test-Path (Join-Path $sfSteam 'millennium\bin')) {
     if (Get-Process steam -ErrorAction SilentlyContinue) { throw 'Exit Steam normally, then rerun Install.ps1 to install the plugin.' }
     New-Item -ItemType Directory -Force -Path (Split-Path $sfPlugin) | Out-Null
     if (Test-Path $sfPlugin) { Copy-Item $sfPlugin ($sfPlugin + '.bak') -Force }
-    Copy-Item (Join-Path $sfRoot 'Millennium\SteamFusion.star') $sfPlugin -Force
+    Copy-Item (Join-Path $sfRoot 'App\Millennium\SteamFusion.star') $sfPlugin -Force
     [IO.File]::WriteAllText((Join-Path $sfData 'installed-plugin.txt'), $sfPlugin, $sfUtf8)
     Write-Host ('Plugin installed: ' + $sfPlugin)
 } else {
@@ -40,16 +40,16 @@ foreach ($sfAccount in $sfConfig.accounts) {
     $sfLines += ''
 }
 [IO.File]::WriteAllLines((Join-Path $PSScriptRoot 'Sandboxie.generated.ini'), $sfLines, $sfUtf8)
-& (Join-Path $PSScriptRoot 'Create-Launchers.ps1')
+& (Join-Path $PSScriptRoot 'Register-Paths.ps1')
 if ($Startup) {
     $sfLink = Join-Path ([Environment]::GetFolderPath('Startup')) 'SteamFusion.lnk'
     $sfShell = New-Object -ComObject WScript.Shell
     $sfShortcut = $sfShell.CreateShortcut($sfLink)
     $sfShortcut.TargetPath = $sfApp; $sfShortcut.Arguments = '--agent'; $sfShortcut.WorkingDirectory = $sfRoot
-    $sfShortcut.IconLocation = (Join-Path $sfRoot 'Assets\SteamFusion.ico') + ',0'
+    $sfShortcut.IconLocation = (Join-Path $sfRoot 'App\Assets\SteamFusion.ico') + ',0'
     $sfShortcut.Save()
     Write-Host 'Background controller will start at Windows sign-in.'
 }
 Write-Host ('Configuration: ' + $sfData)
-Write-Host 'Open SteamFusion.exe to check accounts and game routes.'
+Write-Host 'Open the root SteamFusion shortcut to check accounts and game routes.'
 if (!$NoStart) { Start-Process -FilePath $sfApp }

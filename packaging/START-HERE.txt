@@ -1,0 +1,15 @@
+SteamFusion
+
+日常使用：双击本目录的 SteamFusion 快捷方式，随后照常打开 Steam。
+关闭设置窗口会保留托盘后台；在托盘右键菜单中可以退出。
+
+App        程序和运行文件，实际程序为 App\SteamFusion.exe。
+Scripts    安装、沙盒管理与备用启动入口。
+Docs       完整说明、验证记录、源码和校验文件。
+Data       备份、诊断、游戏时长与成就导出文件。
+Sandboxes  已登录的沙盒环境，请勿删除或随意移动。
+
+快捷方式不可用：运行 Scripts\Start.cmd。
+首次配置：运行 Scripts\Install.cmd，详见 Docs\README.md。
+移动整个文件夹后：先退出托盘后台，再运行 Scripts\Register-Paths.cmd，更新插件和快捷方式路径。
+普通 Steam 使用原有 Steam 快捷方式；两个沙盒的备用入口在 Scripts\Launchers。

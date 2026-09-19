@@ -21,7 +21,7 @@ public static class SFBoxProbe {
     if ($sfStatus -ne 0) { throw ('Process query status: ' + $sfStatus) }
     $sfReport.actualBox = $sfBox.ToString()
     if ($sfReport.actualBox -ne $ExpectedBox) { throw 'Sandbox identity mismatch.' }
-    $sfReplyText = (& (Join-Path $ReleaseDirectory 'SteamFusion.Cli.exe') status | Out-String)
+    $sfReplyText = (& (Join-Path $ReleaseDirectory 'App\SteamFusion.Cli.exe') status | Out-String)
     if ($LASTEXITCODE -ne 0) { throw ('Controller request failed: ' + $sfReplyText) }
     $sfReply = $sfReplyText | ConvertFrom-Json
     if (!$sfReply.success) { throw $sfReply.message }

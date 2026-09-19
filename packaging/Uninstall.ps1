@@ -2,7 +2,7 @@
 param([switch]$RemoveLibraryEntries)
 $ErrorActionPreference = 'Stop'
 $sfRoot = Split-Path -Parent $PSScriptRoot
-$sfCli = Join-Path $sfRoot 'SteamFusion.Cli.exe'
+$sfCli = Join-Path $sfRoot 'App\SteamFusion.Cli.exe'
 $sfData = Join-Path $env:LOCALAPPDATA 'SteamFusion'
 & $sfCli exit
 if ($LASTEXITCODE -ne 0) { throw 'Wait for or cancel the active operation before uninstalling.' }
