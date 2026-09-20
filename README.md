@@ -67,6 +67,10 @@ SteamFusion/
 
 ## 日常使用
 
+完成首次配置后可直接打开普通 Steam，插件会自动加载。第一次路由启动、下载或打开设置时，CLI 会按需唤起托盘后台；后台尚未启动时没有托盘图标是正常现象。对于禁止子进程脱离的插件进程组，控制器改由当前 Windows 桌面进程作为父进程创建，避免被插件重载或 Steam 退出连带关闭。无需强制开启 Windows 自启动；桌面不可用等异常会显示具体 Win32 错误码，可用根目录快捷方式手动启动后重试。
+
+同一 Windows 用户下，Steam 使用管理员权限、控制器使用普通权限时也可以通信；连接按实际用户身份校验，管道访问权限仅授予该用户。
+
 在 Steam 库中点击路由按钮，控制器选择普通或沙盒 Steam，并在必要时提示核对登录身份、云同步与存档。环境和账号已经符合规则时使用原生启动流程。
 
 对于不能在沙盒运行的游戏，选择“必须使用普通客户端”，允许自动切号，或在“账号与环境”页面手动交换普通账号。交换不会迁移正在运行的进程，也不会在游戏结束后自动换回。
@@ -138,6 +142,10 @@ npm run build
 ```
 
 Windows 文件集成测试：正常退出 Steam 后运行 `dotnet run --project tests/SteamFusion.Windows.Tests -c Release`。这些测试在临时目录验证快捷方式读写、幂等性、备份、损坏保护和中文路径。
+
+Windows 后台唤起回归测试：`dotnet run --project tests/SteamFusion.Windows.Tests -c Release -- --agent-startup`。需要当前用户的 Windows 桌面会话；仅使用临时测试进程和目录，可在 Steam 运行时执行。验证禁止脱离的进程组中原启动方式失败、桌面父进程方式成功、进程组关闭后测试后台仍存活，以及缺失程序的错误提示。
+
+Windows 管道身份回归测试：`dotnet run --project tests/SteamFusion.Windows.Tests -c Release -- --pipe-identity`。使用临时管道验证仅当前用户的访问权限、服务端所有者、客户端实际用户身份、匿名请求拒绝和往返通信，可在 Steam 运行时执行。
 
 结构：`src/SteamFusion.Core` 为路由与数据处理，`src/SteamFusion.Windows` 为 Windows 集成，`src/SteamFusion.App` 为 WPF UI 和托盘，`src/SteamFusion.Cli` 为命令行入口，`integrations/millennium` 为插件，`packaging` 为安装维护脚本。
 

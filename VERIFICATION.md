@@ -95,3 +95,16 @@ Windows 账号选择集成测试通过 `--account-selection` 单独运行，只�
 
 
 滚动条样式补充：侧栏列表、封面页和详情面板统一使用透明轨道及 8px 深灰圆角滑块，移除上下箭头并在悬停时提亮。规则限定插件自己的滚动容器，不影响原生 Steam 控件。仅涉及 CSS，发布构建通过，并使用 Chromium 预览检查实际滚动条绘制。
+
+
+## 重启后首次自动唤起后台修复
+
+用户从 Steam 插件第一次下载时出现“无法启动独立后台控制器”。检查发现 Millennium Lua 后台位于 Windows Job Object 中；原 CLI 无条件使用 `CREATE_BREAKAWAY_FROM_JOB`，遇到禁止脱离的进程组会返回 Win32 5。之前后台已运行时的验证未覆盖此路径。
+
+保留直接脱离方式；仅在调用者属于进程组且创建返回拒绝访问时，使用当前交互桌面的进程作为 `PROC_THREAD_ATTRIBUTE_PARENT_PROCESS`，创建独立控制器。未放宽进程组限制、未提权、不在插件进程组内兜底启动；沙盒内禁止自启控制器的检查仍保留。错误信息现在包含 Windows 原始错误和错误码。父进程属性继承规则依据 [Microsoft 文档](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-updateprocthreadattribute)。
+
+首次修复后，用户实际重试触发管道错误 “not owned by the current user”。只读检查确认 Steam/插件使用管理员令牌，桌面后台使用普通令牌，实际 User SID 相同而令牌 Owner 不同；原 `PipeOptions.CurrentUserOnly` 因此拒绝连接。改用显式用户专属管道 ACL，所有者设为实际用户 SID；客户端核对服务端所有者，服务端在读取后、分派命令前核对客户端实际用户身份，无法识别及匿名请求拒绝执行。没有向其他用户或管理员组增加访问权限。
+
+核心测试 54/54 通过。Windows 专项测试使用带 KILL_ON_JOB_CLOSE、禁止脱离的临时进程组，确认旧方式返回 Win32 5、新方式成功、测试后台不属于该组且关闭组后仍存活、缺失 EXE 显示原始错误码。管道专项测试通过，覆盖受保护的单用户 ACL、实际用户所有者、双向身份校验、匿名请求拒绝及往返通信。测试使用独立测试后台和临时管道，不读取或修改 Steam 登录状态。
+
+App/CLI 自包含发布成功并更新本机交付。后台关闭后，用户直接点击实际 Steam 中的“到所属账号下载”，确认进入提示或小号游戏页，运行记录也显示成功打开所属账号的游戏页。这验证了当前管理员 Steam 到普通权限后台的按需启动与通信；修复后未再次重启整个 Windows 系统。

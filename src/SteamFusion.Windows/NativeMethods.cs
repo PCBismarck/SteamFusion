@@ -21,6 +21,18 @@ public static class NativeMethods
         IntPtr threadAttributes, bool inheritHandles, uint flags, IntPtr environment, string directory,
         ref StartupInfo startupInfo, out ProcessInfo processInfo);
     [DllImport("kernel32.dll")] private static extern bool CloseHandle(IntPtr handle);
+    [DllImport("kernel32.dll", SetLastError = true)] private static extern bool IsProcessInJob(IntPtr process, IntPtr job, out bool result);
+    [DllImport("kernel32.dll")] private static extern IntPtr GetCurrentProcess();
+    [DllImport("user32.dll")] private static extern IntPtr GetShellWindow();
+    [DllImport("user32.dll", SetLastError = true)] private static extern uint GetWindowThreadProcessId(IntPtr window, out uint pid);
+    [DllImport("kernel32.dll", SetLastError = true)] private static extern IntPtr OpenProcess(uint access, bool inherit, uint pid);
+    [DllImport("kernel32.dll", SetLastError = true)] private static extern bool InitializeProcThreadAttributeList(IntPtr list, int count, uint flags, ref IntPtr size);
+    [DllImport("kernel32.dll", SetLastError = true)] private static extern bool UpdateProcThreadAttribute(IntPtr list, uint flags, IntPtr attribute, IntPtr value, IntPtr size, IntPtr previous, IntPtr returned);
+    [DllImport("kernel32.dll")] private static extern void DeleteProcThreadAttributeList(IntPtr list);
+    [DllImport("kernel32.dll", EntryPoint = "CreateProcessW", ExactSpelling = true, SetLastError = true, CharSet = CharSet.Unicode)]
+    private static extern bool CreateProcessExtended(string application, StringBuilder commandLine, IntPtr processAttributes,
+        IntPtr threadAttributes, bool inheritHandles, uint flags, IntPtr environment, string directory,
+        ref StartupInfoEx startupInfo, out ProcessInfo processInfo);
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)] private struct StartupInfo
     {
         public int cb; public string? reserved, desktop, title;
@@ -28,16 +40,64 @@ public static class NativeMethods
         public short showWindow, reserved2; public IntPtr reservedPtr, stdin, stdout, stderr;
     }
     [StructLayout(LayoutKind.Sequential)] private struct ProcessInfo { public IntPtr process, thread; public uint pid, tid; }
+    [StructLayout(LayoutKind.Sequential)] private struct StartupInfoEx { public StartupInfo startup; public IntPtr attributes; }
     public static void StartAgent(string exe)
     {
         RequireOutsideSandbox();
         var startup = new StartupInfo { cb = Marshal.SizeOf<StartupInfo>() };
-        // Break out of Steam's job if one exists; this process must survive Steam's shutdown.
+        // The controller must survive Steam/plugin shutdown. Some Millennium backend
+        // jobs disallow breakaway: inherit the interactive shell's job/token instead.
         var command = new StringBuilder(Quote(exe) + " --agent");
         if (!CreateProcessW(exe, command, IntPtr.Zero, IntPtr.Zero, false, 0x01000008, IntPtr.Zero,
             Path.GetDirectoryName(exe)!, ref startup, out var process))
-            throw new Win32Exception(Marshal.GetLastWin32Error(), "无法启动独立后台控制器。请先双击 SteamFusion.exe 启动设置窗口。");
+        {
+            var error = Marshal.GetLastWin32Error();
+            if (error == 5 && IsProcessInJob(GetCurrentProcess(), IntPtr.Zero, out var inJob) && inJob)
+            {
+                try { StartAgentFromDesktop(exe); return; }
+                catch (Win32Exception ex)
+                {
+                    throw new Win32Exception(ex.NativeErrorCode, $"无法通过桌面启动后台控制器：{ex.Message}（Win32 {ex.NativeErrorCode}）。请双击发布目录的 SteamFusion 快捷方式后重试。");
+                }
+            }
+            throw new Win32Exception(error, $"无法启动后台控制器：{new Win32Exception(error).Message}（Win32 {error}）。请双击发布目录的 SteamFusion 快捷方式后重试。");
+        }
         CloseHandle(process.thread); CloseHandle(process.process);
+    }
+
+    private static void StartAgentFromDesktop(string exe)
+    {
+        var shell = GetShellWindow();
+        if (shell == IntPtr.Zero) throw new Win32Exception(1168, "当前 Windows 桌面尚未就绪");
+        if (GetWindowThreadProcessId(shell, out var pid) == 0) throw new Win32Exception(Marshal.GetLastWin32Error());
+        var parent = OpenProcess(0x0080, false, pid); // PROCESS_CREATE_PROCESS, no elevation or handle inheritance.
+        if (parent == IntPtr.Zero) throw new Win32Exception(Marshal.GetLastWin32Error());
+        IntPtr attributes = IntPtr.Zero, parentValue = IntPtr.Zero;
+        var initialized = false;
+        try
+        {
+            var size = IntPtr.Zero;
+            InitializeProcThreadAttributeList(IntPtr.Zero, 1, 0, ref size);
+            if (size == IntPtr.Zero) throw new Win32Exception(Marshal.GetLastWin32Error());
+            attributes = Marshal.AllocHGlobal(size);
+            if (!InitializeProcThreadAttributeList(attributes, 1, 0, ref size)) throw new Win32Exception(Marshal.GetLastWin32Error());
+            initialized = true;
+            parentValue = Marshal.AllocHGlobal(IntPtr.Size); Marshal.WriteIntPtr(parentValue, parent);
+            if (!UpdateProcThreadAttribute(attributes, 0, (IntPtr)0x00020000, parentValue, (IntPtr)IntPtr.Size, IntPtr.Zero, IntPtr.Zero))
+                throw new Win32Exception(Marshal.GetLastWin32Error());
+            var startup = new StartupInfoEx { startup = new() { cb = Marshal.SizeOf<StartupInfoEx>() }, attributes = attributes };
+            if (!CreateProcessExtended(exe, new StringBuilder(Quote(exe) + " --agent"), IntPtr.Zero, IntPtr.Zero, false,
+                0x00080008, IntPtr.Zero, Path.GetDirectoryName(exe)!, ref startup, out var process))
+                throw new Win32Exception(Marshal.GetLastWin32Error());
+            CloseHandle(process.thread); CloseHandle(process.process);
+        }
+        finally
+        {
+            if (initialized) DeleteProcThreadAttributeList(attributes);
+            if (attributes != IntPtr.Zero) Marshal.FreeHGlobal(attributes);
+            if (parentValue != IntPtr.Zero) Marshal.FreeHGlobal(parentValue);
+            CloseHandle(parent);
+        }
     }
 
     public static string Quote(string value)
