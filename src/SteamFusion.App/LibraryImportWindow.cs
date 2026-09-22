@@ -40,6 +40,7 @@ public sealed class LibraryImportWindow : Window
         actions.Children.Add(Action("选择可导入项", () => SetVisible(true)));
         actions.Children.Add(Action("清空当前选择", () => SetVisible(false)));
         actions.Children.Add(Action("刷新读取", Reload));
+        actions.Children.Add(Action("重新同步游戏库", () => { new LibrarySyncWindow(controller) { Owner = this }.ShowDialog(); Reload(); }));
         actions.Children.Add(Action("导入已勾选游戏", Apply));
         actions.Children.Add(Action("关闭", Close));
         var checkStyle = new Style(typeof(CheckBox), (Style)FindResource(typeof(CheckBox)));

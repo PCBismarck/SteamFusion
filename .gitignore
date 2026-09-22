@@ -53,3 +53,4 @@ Sandboxie.generated.ini
 *.tmp
 installation-index.json
 catalog-import.json
+library-sync-session.json

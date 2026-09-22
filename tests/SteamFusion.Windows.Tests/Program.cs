@@ -5,6 +5,7 @@ if (args.Contains("--agent")) return AgentStartupTests.Agent();
 if (args.Contains("--startup-job-worker")) return AgentStartupTests.Worker();
 if (args.Contains("--agent-startup")) return AgentStartupTests.Run();
 if (args.Contains("--pipe-identity")) return await PipeIdentityTests.Run();
+if (args.Contains("--library-sync")) return LibrarySyncStoreTests.Run();
 
 if (args.Contains("--selection-preflight"))
 {

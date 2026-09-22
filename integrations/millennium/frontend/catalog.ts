@@ -5,7 +5,7 @@ export type LibraryGame = {
     installed: boolean; cloudEnabled: boolean | null;
 };
 export type LibrarySnapshot = {
-    schemaVersion: number; source: string; steamId: string; capturedAt: string; games: LibraryGame[];
+    schemaVersion: number; source: string; steamId: string; capturedAt: string; games: LibraryGame[]; includesHiddenGames: boolean;
 };
 
 /** Match Steam's own My Games / shared library classification, not LastOwner. */
@@ -15,7 +15,7 @@ export function captureLibrary(store: any, steamId: string, details: any, now = 
     const games: LibraryGame[] = [];
     const seen = new Set<number>();
     for (const app of store.allApps) {
-        if (app?.app_type !== 1 || app.visible_in_game_list !== true) continue;
+        if (app?.app_type !== 1) continue;
         const appId = parseAppId(app.appid);
         if (appId === null || seen.has(appId) || typeof app.display_name !== 'string' || !app.display_name.trim())
             throw new Error('Steam 游戏库数据格式变化，已停止采集');
@@ -29,5 +29,5 @@ export function captureLibrary(store: any, steamId: string, details: any, now = 
             cloudEnabled: detail?.bCloudAvailable === true && detail?.bCloudEnabledForAccount === true && detail?.bCloudEnabledForApp === true
                 ? true : detail?.bCloudAvailable === false || detail?.bCloudEnabledForAccount === false || detail?.bCloudEnabledForApp === false ? false : null });
     }
-    return { schemaVersion: 1, source: 'steam-client', steamId, capturedAt: now.toISOString(), games };
+    return { schemaVersion: 1, source: 'steam-client', steamId, capturedAt: now.toISOString(), games, includesHiddenGames: true };
 }

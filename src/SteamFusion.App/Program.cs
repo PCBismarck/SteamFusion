@@ -152,6 +152,14 @@ public sealed class Controller
             return CatalogStore.Import(Discovery.Store.Load(), selection);
         }
     }
+    public LibrarySyncResult SynchronizeLibrary(string fingerprint, IEnumerable<uint> selected)
+    {
+        lock (operationLock)
+        {
+            if (operation is not null) throw new InvalidOperationException("请等待当前启动或切换操作结束再同步。");
+            return LibrarySyncStore.Current().Apply(fingerprint, selected);
+        }
+    }
 }
 
 public sealed class DialogInteraction(Application app) : IUserInteraction

@@ -253,6 +253,7 @@ Test("Legacy Watt path is ignored while account and routing configuration surviv
 
 var failed = 0;
 GameDataExportTests.Register(Test);
+LibrarySyncTests.Register(Test);
 foreach (var (name, run) in tests)
 {
     try { await run(); Console.WriteLine("PASS " + name); }

@@ -43,7 +43,8 @@ export function installationIds(value: unknown, now = Date.now()): Set<number> {
 export function uninstalledGames(games: Mapping[], viewer: string | null, host: string | null | undefined, installed: Set<number>, visible: any[]): Mapping[] {
     if (!viewer || viewer !== host) return [];
     const local = new Set(installed);
-    for (const app of visible) if (app.app_type !== 1073741824 && app.local_per_client_data?.installed === true) local.add(app.appid);
+    for (const app of visible) if (app.app_type !== 1073741824 &&
+        (app.local_per_client_data?.installed === true || app.subscribed_to === true)) local.add(app.appid);
     return sortGames(games.filter(game => game.enabled && game.steamId !== viewer && game.gameName && !local.has(game.appId)), 'name-asc');
 }
 export function filterGames(games: Mapping[], query: string): Mapping[] {

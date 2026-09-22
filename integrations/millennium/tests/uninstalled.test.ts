@@ -38,6 +38,14 @@ test('virtual library shows only enabled foreign-account games not installed loc
 test('changing Steam account hides the host-only virtual page', () => {
     for(const viewer of [null,other]) assert.deepEqual(uninstalledGames([game(10)],viewer,main,new Set(),[]),[]);
 });
+test('native family access hides duplicate foreign entries and revoked access restores them', () => {
+    const games = [game(10), game(20), game(30), game(40)];
+    const apps = [{ appid: 10, app_type: 1, subscribed_to: true }, { appid: 20, app_type: 1, subscribed_to: false },
+        { appid: 30, app_type: 1 }, { appid: 40, app_type: 1073741824, subscribed_to: true }];
+    assert.deepEqual(uninstalledGames(games, main, main, new Set(), apps).map(g => g.appId), [20,30,40]);
+    apps[0].subscribed_to = false;
+    assert.equal(uninstalledGames(games, main, main, new Set(), apps).length, 4);
+});
 test('completed installation removes game, uninstall makes it available again', () => {
     assert.equal(uninstalledGames([game(10)],main,main,new Set([10]),[]).length,0);
     assert.equal(uninstalledGames([game(10)],main,main,new Set(),[]).length,1);

@@ -3,6 +3,7 @@ namespace SteamFusion.Core;
 public sealed record LibraryGame(uint AppId, string Name, bool? Subscribed, uint OwnerAccountId, bool Installed, bool? CloudEnabled);
 public sealed record LibrarySnapshot(int SchemaVersion, string Source, string SteamId, DateTimeOffset CapturedAt, List<LibraryGame> Games)
 {
+    public bool IncludesHiddenGames { get; init; }
     public void Validate()
     {
         if (SchemaVersion != 1 || Source != "steam-client" || !System.Text.RegularExpressions.Regex.IsMatch(SteamId ?? "", "^765[0-9]{14}$") ||

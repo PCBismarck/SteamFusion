@@ -22,6 +22,12 @@ test('missing access and cloud data remain unknown', () => {
     const data = captureLibrary(store([{ ...game, subscribed_to: undefined }]), user, null);
     assert.equal(data.games[0].subscribed, null); assert.equal(data.games[0].cloudEnabled, null);
 });
+test('complete synchronization includes hidden games so hiding cannot revoke a license', () => {
+    const data = captureLibrary(store([{ ...game, visible_in_game_list: false }]), user, null);
+    assert.equal(data.includesHiddenGames, true);
+    assert.equal(data.games.length, 1);
+    assert.equal(data.games[0].subscribed, true);
+});
 test('incomplete library and duplicate IDs cannot replace a valid snapshot', () => {
     assert.throws(() => captureLibrary({ ...store([game]), m_bIsInitialized: false }, user, null));
     assert.throws(() => captureLibrary(store([game,game]), user, null));
