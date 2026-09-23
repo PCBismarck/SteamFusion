@@ -13,6 +13,21 @@ internal static class LibrarySyncTests
     private static void Reject(Action action) { try { action(); } catch (InvalidOperationException) { return; } catch (InvalidDataException) { return; } throw new Exception("Expected rejection"); }
     public static void Register(Action<string, Action> test)
     {
+        test("Explicit native preference rebuilds valid foreign and unknown routes but keeps fixed and disabled rules", () =>
+        {
+            var fixedGame = Game with { AppId = 30, Saves = SaveMode.FixedEnvironment, FixedEnvironment = "Box_B" };
+            var disabled = Game with { AppId = 40, Enabled = false };
+            var cfg = Config with { Games = [Game, Game with { AppId = 20 }, fixedGame, disabled] };
+            var snapshots = new[] { Snapshot(A, Entry(10), Entry(20), Entry(30), Entry(40)), Snapshot(B, Entry(10), Entry(20, null), Entry(30), Entry(40)) };
+            var p = LibrarySync.Preview(cfg, snapshots, Now.AddMinutes(-2), Now, true);
+            Check(p.Changes.Count(c => c.Action == LibrarySyncAction.Reassign) == 2);
+            Check(p.Changes.Single(c => c.AppId == 30).Action == LibrarySyncAction.Review);
+            Check(p.Changes.Single(c => c.AppId == 40).Action == LibrarySyncAction.Keep);
+            var updated = LibrarySync.Apply(cfg, p, p.Fingerprint, [10, 20]);
+            Check(updated.Games.Where(g => g.AppId <= 20).All(g => g.AccountId == "a" && g.Saves == SaveMode.Unknown));
+            var otherMode = LibrarySync.Preview(cfg, snapshots, Now.AddMinutes(-2), Now);
+            Reject(() => LibrarySync.Apply(cfg, otherMode, p.Fingerprint, [10]));
+        });
         test("Family transfer proposes reassignment and preserves runtime options while resetting save consent", () =>
         {
             var p = Preview(Config, Snapshot(A, Entry(10)), Snapshot(B, Entry(20)));

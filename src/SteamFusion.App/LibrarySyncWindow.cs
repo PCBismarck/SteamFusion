@@ -15,6 +15,7 @@ public sealed class LibrarySyncWindow : Window
     private readonly TextBlock summary = new() { TextWrapping = TextWrapping.Wrap, Margin = new(0, 12, 0, 12) };
     private readonly TextBox search = new() { MinWidth = 280, Margin = new(0, 0, 16, 0) };
     private readonly CheckBox showKept = new() { Content = "显示无需变更项", VerticalAlignment = VerticalAlignment.Center };
+    private readonly CheckBox preferNative = new() { Content = "重新分配：可用时优先普通账号（当前配置为大号）", Margin = new(0, 0, 0, 12) };
     private readonly DataGrid table = new() { AutoGenerateColumns = false, CanUserAddRows = false, CanUserDeleteRows = false,
         RowHeight = 58, EnableRowVirtualization = true, HeadersVisibility = DataGridHeadersVisibility.Column,
         GridLinesVisibility = DataGridGridLinesVisibility.Horizontal, SelectionMode = DataGridSelectionMode.Extended };
@@ -32,6 +33,7 @@ public sealed class LibrarySyncWindow : Window
         top.Children.Add(new TextBlock { Text = "重新核对两个账号的游戏库", FontSize = 24, FontWeight = FontWeights.SemiBold });
         top.Children.Add(new TextBlock { Text = "家庭变更后开始新一轮采集 → 两个账号分别在普通 Steam 加载库并等待约 1 分钟 → 刷新预览 → 勾选并应用。\n采集进度会保留，可以关闭此窗口去切换账号。沙盒内没有插件，不能采集。", TextWrapping = TextWrapping.Wrap, Margin = new(0, 10, 0, 0), Foreground = Ui.Brush("MutedBrush") });
         top.Children.Add(summary);
+        top.Children.Add(preferNative);
         var filters = new WrapPanel { Margin = new(0, 0, 0, 12) }; top.Children.Add(filters);
         filters.Children.Add(new TextBlock { Text = "搜索游戏 / AppID", VerticalAlignment = VerticalAlignment.Center, Margin = new(0, 0, 10, 0) });
         filters.Children.Add(search); filters.Children.Add(showKept);
@@ -62,12 +64,14 @@ public sealed class LibrarySyncWindow : Window
         table.Columns.Add(new DataGridTextColumn { Header = "说明", Binding = new Binding(nameof(LibrarySyncRow.Reason)), Width = new(1.5, DataGridLengthUnitType.Star), IsReadOnly = true, ElementStyle = reasonStyle });
         panel.Children.Add(table);
         search.TextChanged += (_, _) => view?.Refresh(); showKept.Checked += (_, _) => view?.Refresh(); showKept.Unchecked += (_, _) => view?.Refresh();
+        preferNative.Checked += (_, _) => Reload(); preferNative.Unchecked += (_, _) => Reload();
         Reload();
     }
     private void Column(string title, string property, DataGridLength width) => table.Columns.Add(new DataGridTextColumn { Header = title, Binding = new Binding(property), Width = width, IsReadOnly = true });
     private void Reload()
     {
-        preview = store.Preview(); var config = Discovery.Store.Load();
+        preview = store.Preview(preferNative.IsChecked == true); var config = Discovery.Store.Load();
+        preferNative.Content = "重新分配：可用时优先 " + config.Accounts.FirstOrDefault(a => a.Id == config.DefaultNativeAccountId)?.Name;
         rows = preview.Changes.Select(c => new LibrarySyncRow(c, config)).ToList();
         view = CollectionViewSource.GetDefaultView(rows);
         view.Filter = item => item is LibrarySyncRow row && (showKept.IsChecked == true || row.Change.Action != LibrarySyncAction.Keep) &&
@@ -91,7 +95,7 @@ public sealed class LibrarySyncWindow : Window
         if (MessageBox.Show(this, $"应用 {selected.Count} 项变更，其中改账号 {moved} 项、停用 {disabled} 项？\n\n改账号不会迁移原账号存档，首次启动需要重新核对。将先备份原配置。", "确认游戏库变更", MessageBoxButton.OKCancel) != MessageBoxResult.OK) return;
         try
         {
-            var result = controller.SynchronizeLibrary(preview!.Fingerprint, selected.Select(r => r.AppId));
+            var result = controller.SynchronizeLibrary(preview!.Fingerprint, selected.Select(r => r.AppId), preferNative.IsChecked == true);
             Reload(); summary.Text = $"已应用 {result.Changed} 项。备份：{result.BackupDirectory}\n" + summary.Text;
         }
         catch (Exception ex) { MessageBox.Show(this, ex.Message, "同步未完成"); Reload(); }

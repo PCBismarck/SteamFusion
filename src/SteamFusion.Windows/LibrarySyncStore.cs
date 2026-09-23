@@ -17,7 +17,7 @@ public sealed class LibrarySyncStore(ConfigurationStore store, string backupRoot
     }
     public LibrarySyncSession Session() => File.Exists(SessionPath)
         ? Json.Decode<LibrarySyncSession>(File.ReadAllText(SessionPath)) : Begin();
-    public LibrarySyncPreview Preview()
+    public LibrarySyncPreview Preview(bool preferNative = false)
     {
         var config = store.Load(); var snapshots = new List<LibrarySnapshot>();
         foreach (var account in config.Accounts)
@@ -32,14 +32,14 @@ public sealed class LibrarySyncStore(ConfigurationStore store, string backupRoot
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Text.Json.JsonException or InvalidDataException) { }
         }
-        return LibrarySync.Preview(config, snapshots, Session().StartedAt, DateTimeOffset.UtcNow);
+        return LibrarySync.Preview(config, snapshots, Session().StartedAt, DateTimeOffset.UtcNow, preferNative);
     }
-    public LibrarySyncResult Apply(string reviewedFingerprint, IEnumerable<uint> selection)
+    public LibrarySyncResult Apply(string reviewedFingerprint, IEnumerable<uint> selection, bool preferNative = false)
     {
         var selected = selection.ToArray();
         var originalText = File.ReadAllText(store.ConfigPath);
         var original = Json.Decode<Configuration>(originalText);
-        var preview = Preview();
+        var preview = Preview(preferNative);
         var updated = LibrarySync.Apply(original, preview, reviewedFingerprint, selected);
         if (File.ReadAllText(store.ConfigPath) != originalText) throw new IOException("配置已被其他窗口修改，请刷新预览。");
         var backup = Path.Combine(backupRoot, "library-sync-" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + "-" + Guid.NewGuid().ToString("N")[..8]);

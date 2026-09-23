@@ -41,6 +41,10 @@ internal static class LibrarySyncStoreTests
             p = failing.Preview();
             try { failing.Apply(p.Fingerprint, [10]); throw new Exception("Expected publication failure."); } catch (IOException) { }
             if (File.ReadAllText(configStore.ConfigPath) != original || published?.Games.Single() != game || calls != 2) throw new Exception("Rollback failed.");
+            Snapshot(b, 10);
+            if (sync.Preview().Changes.Single().CanApply) throw new Exception("Default mode changed a valid route.");
+            p = sync.Preview(true); sync.Apply(p.Fingerprint, [10], true);
+            if (configStore.Load().Games.Single().AccountId != "a") throw new Exception("Explicit native preference was not applied.");
             Console.WriteLine("PASS library sync store: persisted collection session, fresh preview, exact configuration backup, selected apply, stale evidence rejection and publication rollback.");
             return 0;
         }

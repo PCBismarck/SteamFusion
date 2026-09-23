@@ -152,12 +152,12 @@ public sealed class Controller
             return CatalogStore.Import(Discovery.Store.Load(), selection);
         }
     }
-    public LibrarySyncResult SynchronizeLibrary(string fingerprint, IEnumerable<uint> selected)
+    public LibrarySyncResult SynchronizeLibrary(string fingerprint, IEnumerable<uint> selected, bool preferNative = false)
     {
         lock (operationLock)
         {
             if (operation is not null) throw new InvalidOperationException("请等待当前启动或切换操作结束再同步。");
-            return LibrarySyncStore.Current().Apply(fingerprint, selected);
+            return LibrarySyncStore.Current().Apply(fingerprint, selected, preferNative);
         }
     }
 }

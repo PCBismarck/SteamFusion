@@ -13,7 +13,7 @@ public sealed record LibrarySyncPreview(string Fingerprint, bool Ready, List<Lib
 
 public static class LibrarySync
 {
-    public static LibrarySyncPreview Preview(Configuration config, IEnumerable<LibrarySnapshot> snapshots, DateTimeOffset since, DateTimeOffset now)
+    public static LibrarySyncPreview Preview(Configuration config, IEnumerable<LibrarySnapshot> snapshots, DateTimeOffset since, DateTimeOffset now, bool preferNative = false)
     {
         config.Validate();
         if (since == default || since > now) throw new InvalidDataException("同步开始时间无效。");
@@ -43,7 +43,7 @@ public static class LibrarySync
         // content must not invalidate a user's selection, but changed licenses must.
         var fingerprint = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(Json.Encode(new
         {
-            config, since,
+            config, since, preferNative,
             evidence = valid.OrderBy(p => p.Key, StringComparer.Ordinal).Select(p => new { account = p.Key, games = p.Value.Values.OrderBy(g => g.AppId) })
         }))));
         if (config.Accounts.Count == 0 || valid.Count != config.Accounts.Count) return new(fingerprint, false, states, []);
@@ -68,6 +68,14 @@ public static class LibrarySync
                 continue;
             }
             if (!before.Enabled) { Add(LibrarySyncAction.Keep, before, "保留已停用规则；如需恢复请在设置中启用"); continue; }
+            if (preferNative && before.AccountId != config.DefaultNativeAccountId && target.Account?.Id == config.DefaultNativeAccountId)
+            {
+                if (before.Saves == SaveMode.FixedEnvironment)
+                    Add(LibrarySyncAction.Review, before, "普通账号可用，但存档固定了运行环境；请先处理存档后手动改账号");
+                else Add(LibrarySyncAction.Reassign, before with { AccountId = target.Account.Id, Saves = SaveMode.Unknown },
+                    "按优先普通账号重新分配；保留运行设置，存档改为待核对，不迁移存档");
+                continue;
+            }
             var current = valid[before.AccountId].GetValueOrDefault(id);
             if (current?.Subscribed == true) { Add(LibrarySyncAction.Keep, before, "原账号仍可用，保留手动选择和运行设置"); continue; }
             if (current is not null && current.Subscribed is null)
