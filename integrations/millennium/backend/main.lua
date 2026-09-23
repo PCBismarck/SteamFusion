@@ -77,6 +77,27 @@ end
 
 ---@ffi
 ---@param appId number
+---@param steamId string
+---@return boolean
+function fusion_launch_as(appId, steamId)
+    if appId < 1 or appId > 4294967295 or appId ~= math.floor(appId) or not steamId:match("^765%d%d%d%d%d%d%d%d%d%d%d%d%d%d$") then error("启动参数无效") end
+    return spawn("launch-as " .. string.format("%.0f", appId) .. " " .. steamId)
+end
+
+local launch_options_refresh = 0
+---@ffi
+---@return string
+function fusion_launch_options()
+    if environment ~= "native" then return "null" end
+    if os.time() - launch_options_refresh >= 20 then
+        launch_options_refresh = os.time()
+        spawn("refresh-launch-options")
+    end
+    return read(state .. "\\launch-options.json") or "null"
+end
+
+---@ffi
+---@param appId number
 ---@return boolean
 function fusion_download(appId)
     if appId < 1 or appId > 4294967295 or appId ~= math.floor(appId) then error("AppID 无效") end

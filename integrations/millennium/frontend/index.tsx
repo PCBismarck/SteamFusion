@@ -1,6 +1,6 @@
 import { definePlugin, Field, appActionButtonClasses, findModule } from 'millennium';
 import { useState, useEffect } from 'react';
-import { hookRunGame, Mapping } from './routing';
+import { hookRunGame, Mapping, decodeLaunchOptions } from './routing';
 import { decodeConfiguration } from './configuration';
 import { installDetailsButtons } from './details';
 import { captureLibrary } from './catalog';
@@ -11,6 +11,8 @@ import { addMissingShortcuts, removeGeneratedShortcuts } from './shortcuts';
 declare const backend: {
     fusion_config(): Promise<unknown>;
     fusion_launch(appId: number): Promise<boolean>;
+    fusion_launch_as(appId: number, steamId: string): Promise<boolean>;
+    fusion_launch_options(): Promise<unknown>;
     fusion_download(appId: number): Promise<boolean>;
     fusion_installations(): Promise<unknown>;
     fusion_signal(steamId: string, loggedOn: boolean): Promise<boolean>;
@@ -47,8 +49,9 @@ export default definePlugin(() => {
     let catalogAt = 0;
     let catalogUser = '';
     let libraryKey = '', libraryDone = '', libraryRunning = false, libraryRetry = 0;
-    const send = async (id: number) => {
-        if (!await backend.fusion_launch(id)) throw new Error('无法提交启动请求，请打开 SteamFusion 设置检查。');
+    const send = async (id: number, steamId?: string) => {
+        const accepted = steamId ? await backend.fusion_launch_as(id, steamId) : await backend.fusion_launch(id);
+        if (!accepted) throw new Error('无法提交启动请求，请打开 SteamFusion 设置检查。');
     };
     let virtualModel: VirtualLibraryModel = { enabled: false, user: null, games: [], loading: true };
     let navigationClass: string | undefined;
@@ -73,7 +76,10 @@ export default definePlugin(() => {
             const config = decodeConfiguration(await backend.fusion_config());
             if (disposed) return;
             environment = config.environment;
-            mappings = new Map((config.games as Mapping[]).map(g => [g.appId, g]));
+            let choices = new Map<number, import('./routing').LaunchAccount[]>();
+            try { choices = decodeLaunchOptions(await backend.fusion_launch_options()); } catch { /* Single-account routing remains available. */ }
+            if (disposed) return;
+            mappings = new Map((config.games as Mapping[]).map(g => [g.appId, { ...g, launchAccounts: choices.get(g.appId) }]));
             if (!unhook && window.SteamClient?.Apps) {
                 unhook = hookRunGame(window.SteamClient.Apps, id => mappings.get(id),
                     () => ({ steamId: currentUser(), environment }),

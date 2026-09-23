@@ -103,7 +103,7 @@ public sealed class Controller
                     { IsExiting = true; application.Shutdown(); }); });
                     return Task.FromResult(new Reply(true, "exiting", "后台即将退出。"));
                 }
-            case "launch": case "swap": case "download": break;
+            case "launch": case "launch-as": case "swap": case "download": break;
             default: return Task.FromResult(new Reply(false, "unknown_command", "不支持的命令。"));
         }
         if (request.RequestId == Guid.Empty) return Task.FromResult(new Reply(false, "invalid_request", "请求 ID 缺失。"));
@@ -111,9 +111,15 @@ public sealed class Controller
         {
             if (operation is not null) return Task.FromResult(new Reply(false, "busy", "已有操作在执行。"));
             Configuration config;
+            var confirmAccountChange = false;
             try
             {
                 config = Discovery.Store.Load();
+                if (request.Command == "launch-as")
+                {
+                    var choice = AccountLaunch.Prepare(config, request.AppId, request.AccountId ?? "", LaunchOptionsStore.Read(config), DateTimeOffset.UtcNow);
+                    config = choice.Configuration; confirmAccountChange = choice.ConfirmAccountChange;
+                }
                 if (request.Command is "launch" or "download" && !config.Games.Any(g => g.AppId == request.AppId && g.Enabled))
                     throw new InvalidOperationException("请先在 SteamFusion 设置中确认并启用此游戏映射。");
                 if (request.Command == "swap" && !config.Accounts.Any(a => a.Id == request.AccountId))
@@ -130,6 +136,7 @@ public sealed class Controller
                     outcome = request.Command switch
                     {
                         "launch" => await router.LaunchAsync(config, request.AppId, request.RequestId, token),
+                        "launch-as" => await router.LaunchAsync(config, request.AppId, request.RequestId, token, confirmAccountChange),
                         "download" => await router.OpenDownloadAsync(config, request.AppId, request.RequestId, token),
                         _ => await router.SwapAsync(config, request.AccountId!, request.RequestId, token)
                     };

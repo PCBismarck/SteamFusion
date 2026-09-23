@@ -30,6 +30,10 @@ try
         case "swap":
             if (args.Length != 2) throw new ArgumentException("swap <配置中的账号 ID>");
             return await Send(new("swap", AccountId: args[1], RequestId: Guid.NewGuid()));
+        case "launch-as":
+            if (args.Length != 3 || !uint.TryParse(args[1], out var chosenApp) || chosenApp == 0 || !System.Text.RegularExpressions.Regex.IsMatch(args[2], "^765[0-9]{14}$"))
+                throw new ArgumentException("launch-as <AppID> <SteamID>");
+            return await Send(new("launch-as", AppId: chosenApp, AccountId: args[2], RequestId: Guid.NewGuid()));
         case "download":
             if (args.Length != 2 || !uint.TryParse(args[1], out var downloadId) || downloadId == 0) throw new ArgumentException("download <AppID>");
             return await Send(new("download", AppId: downloadId, RequestId: Guid.NewGuid()));
@@ -55,6 +59,7 @@ try
             Console.WriteLine(LibraryShortcuts.Remove(Discovery.Store.Load(), Environment.ProcessPath!)); return 0;
         case "pipe-name": Console.WriteLine(Ipc.PipeName); return 0;
         case "refresh-installations": InstallationIndex.Refresh(Discovery.Store.Load()); return 0;
+        case "refresh-launch-options": LaunchOptionsStore.Refresh(Discovery.Store.Load()); return 0;
         case "refresh-plugin": Discovery.WritePluginConfiguration(Discovery.Store.Load()); return 0;
         default:
             Console.WriteLine("SteamFusion.Cli discover | init | probe | plan <AppID> | launch <AppID> | download <AppID> | swap <accountId> | status | settings | cancel | exit | catalog-preview | catalog-import | install-shortcuts | remove-shortcuts | pipe-name | refresh-plugin | export-data <directory> [accountId]"); return command == "help" ? 0 : 2;

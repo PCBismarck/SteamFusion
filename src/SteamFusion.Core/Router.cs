@@ -10,8 +10,8 @@ public sealed class Router(IRuntime runtime)
     public bool Busy => gate.CurrentCount == 0;
     public event Action<string>? Progress;
 
-    public Task<Outcome> LaunchAsync(Configuration config, uint appId, Guid requestId, CancellationToken ct = default)
-        => RunAsync(requestId, $"launch:{appId}", async () =>
+    public Task<Outcome> LaunchAsync(Configuration config, uint appId, Guid requestId, CancellationToken ct = default, bool confirmAccountChange = false)
+        => RunAsync(requestId, $"launch:{appId}:{config.Games.SingleOrDefault(g => g.AppId == appId)?.AccountId}:{confirmAccountChange}", async () =>
         {
             var game = config.Games.SingleOrDefault(g => g.AppId == appId)
                 ?? throw new InvalidOperationException("该游戏没有配置路由，请先在设置中添加。");
@@ -21,7 +21,7 @@ public sealed class Router(IRuntime runtime)
             string? warning = null;
             if (route.RequiresSwap && !game.AutoSwap)
                 return Outcome.Fail("manual_swap", "此游戏设置为手动切号，请先交换账号位置。");
-            if (game.Saves == SaveMode.Unknown && (route.Environment != "native" || route.RequiresSwap) &&
+            if ((confirmAccountChange || game.Saves == SaveMode.Unknown && (route.Environment != "native" || route.RequiresSwap)) &&
                 !await runtime.ConfirmSaveEnvironmentAsync(game, route, ct))
                 throw new OperationCanceledException();
             if (route.RequiresSwap)

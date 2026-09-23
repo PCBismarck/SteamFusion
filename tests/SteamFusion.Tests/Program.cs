@@ -254,6 +254,22 @@ Test("Legacy Watt path is ignored while account and routing configuration surviv
 var failed = 0;
 GameDataExportTests.Register(Test);
 LibrarySyncTests.Register(Test);
+AccountLaunchTests.Register(Test);
+Async("Explicit alternate account selection asks about saves even when launching natively", async () =>
+{
+    var cfg = config with { Games = [game with { AccountId = "a", Saves = SaveMode.Unknown }] };
+    var fake = new Fake([nativeA, boxB]) { ConfirmSave = false };
+    Equal("cancelled", (await new Router(fake).LaunchAsync(cfg, game.AppId, Guid.NewGuid(), confirmAccountChange: true)).Code);
+    Equal(0, fake.Events.Count);
+});
+Async("Request deduplication distinguishes explicitly selected accounts", async () =>
+{
+    var fake = new Fake([nativeA, boxB]); var router = new Router(fake); var request = Guid.NewGuid();
+    Check((await router.LaunchAsync(config, game.AppId, request)).Success);
+    var cfg = config with { Games = [game with { AccountId = "a" }] };
+    Check(!(await router.LaunchAsync(cfg, game.AppId, request, confirmAccountChange: true)).Success);
+    Equal(1, fake.Events.Count(e => e.StartsWith("launch:")));
+});
 foreach (var (name, run) in tests)
 {
     try { await run(); Console.WriteLine("PASS " + name); }
